@@ -209,6 +209,42 @@ export type Database = {
         }
         Relationships: []
       }
+      staff: {
+        Row: {
+          commission_rate: number
+          created_at: string
+          email: string | null
+          first_name: string
+          id: string
+          is_active: boolean
+          last_name: string
+          phone: string
+          role: string
+        }
+        Insert: {
+          commission_rate?: number
+          created_at?: string
+          email?: string | null
+          first_name: string
+          id?: string
+          is_active?: boolean
+          last_name: string
+          phone?: string
+          role?: string
+        }
+        Update: {
+          commission_rate?: number
+          created_at?: string
+          email?: string | null
+          first_name?: string
+          id?: string
+          is_active?: boolean
+          last_name?: string
+          phone?: string
+          role?: string
+        }
+        Relationships: []
+      }
       transactions: {
         Row: {
           amount_total: number
