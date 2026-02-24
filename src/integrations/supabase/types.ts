@@ -14,7 +14,236 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      appointments: {
+        Row: {
+          client_id: string
+          created_at: string
+          end_time: string
+          id: string
+          internal_notes: string | null
+          is_paid: boolean
+          service_id: string | null
+          staff_id: string | null
+          start_time: string
+          status: Database["public"]["Enums"]["appointment_status"]
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          end_time: string
+          id?: string
+          internal_notes?: string | null
+          is_paid?: boolean
+          service_id?: string | null
+          staff_id?: string | null
+          start_time: string
+          status?: Database["public"]["Enums"]["appointment_status"]
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          end_time?: string
+          id?: string
+          internal_notes?: string | null
+          is_paid?: boolean
+          service_id?: string | null
+          staff_id?: string | null
+          start_time?: string
+          status?: Database["public"]["Enums"]["appointment_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      business_settings: {
+        Row: {
+          brand_color_primary: string
+          created_at: string
+          google_review_url: string | null
+          id: string
+          logo_url: string | null
+          shop_name: string
+          sms_provider_api: string | null
+          theme_style: Database["public"]["Enums"]["theme_style"]
+        }
+        Insert: {
+          brand_color_primary?: string
+          created_at?: string
+          google_review_url?: string | null
+          id?: string
+          logo_url?: string | null
+          shop_name?: string
+          sms_provider_api?: string | null
+          theme_style?: Database["public"]["Enums"]["theme_style"]
+        }
+        Update: {
+          brand_color_primary?: string
+          created_at?: string
+          google_review_url?: string | null
+          id?: string
+          logo_url?: string | null
+          shop_name?: string
+          sms_provider_api?: string | null
+          theme_style?: Database["public"]["Enums"]["theme_style"]
+        }
+        Relationships: []
+      }
+      clients: {
+        Row: {
+          birthday: string | null
+          created_at: string
+          email: string | null
+          first_name: string
+          id: string
+          last_name: string
+          last_visit: string | null
+          nameday_date: string | null
+          personal_preferences: string | null
+          phone_mobile: string
+          tech_notes: string | null
+          total_spent: number
+        }
+        Insert: {
+          birthday?: string | null
+          created_at?: string
+          email?: string | null
+          first_name: string
+          id?: string
+          last_name: string
+          last_visit?: string | null
+          nameday_date?: string | null
+          personal_preferences?: string | null
+          phone_mobile: string
+          tech_notes?: string | null
+          total_spent?: number
+        }
+        Update: {
+          birthday?: string | null
+          created_at?: string
+          email?: string | null
+          first_name?: string
+          id?: string
+          last_name?: string
+          last_visit?: string | null
+          nameday_date?: string | null
+          personal_preferences?: string | null
+          phone_mobile?: string
+          tech_notes?: string | null
+          total_spent?: number
+        }
+        Relationships: []
+      }
+      inventory: {
+        Row: {
+          cost_price: number
+          created_at: string
+          current_stock: number
+          id: string
+          min_stock_level: number
+          product_name: string
+          retail_price: number
+          sku: string | null
+        }
+        Insert: {
+          cost_price?: number
+          created_at?: string
+          current_stock?: number
+          id?: string
+          min_stock_level?: number
+          product_name: string
+          retail_price?: number
+          sku?: string | null
+        }
+        Update: {
+          cost_price?: number
+          created_at?: string
+          current_stock?: number
+          id?: string
+          min_stock_level?: number
+          product_name?: string
+          retail_price?: number
+          sku?: string | null
+        }
+        Relationships: []
+      }
+      services: {
+        Row: {
+          category_color: string
+          created_at: string
+          duration: number
+          id: string
+          price: number
+          required_products: Json | null
+          service_name: string
+        }
+        Insert: {
+          category_color?: string
+          created_at?: string
+          duration: number
+          id?: string
+          price?: number
+          required_products?: Json | null
+          service_name: string
+        }
+        Update: {
+          category_color?: string
+          created_at?: string
+          duration?: number
+          id?: string
+          price?: number
+          required_products?: Json | null
+          service_name?: string
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          amount_total: number
+          appointment_id: string
+          created_at: string
+          id: string
+          payment_method: Database["public"]["Enums"]["payment_method"]
+          staff_commission: number
+        }
+        Insert: {
+          amount_total?: number
+          appointment_id: string
+          created_at?: string
+          id?: string
+          payment_method?: Database["public"]["Enums"]["payment_method"]
+          staff_commission?: number
+        }
+        Update: {
+          amount_total?: number
+          appointment_id?: string
+          created_at?: string
+          id?: string
+          payment_method?: Database["public"]["Enums"]["payment_method"]
+          staff_commission?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +252,14 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      appointment_status:
+        | "Pending"
+        | "Confirmed"
+        | "Cancelled"
+        | "No-Show"
+        | "Completed"
+      payment_method: "Cash" | "Card" | "Revolut" | "Stripe"
+      theme_style: "Minimal" | "Industrial" | "Modern" | "Classic"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +386,16 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      appointment_status: [
+        "Pending",
+        "Confirmed",
+        "Cancelled",
+        "No-Show",
+        "Completed",
+      ],
+      payment_method: ["Cash", "Card", "Revolut", "Stripe"],
+      theme_style: ["Minimal", "Industrial", "Modern", "Classic"],
+    },
   },
 } as const
