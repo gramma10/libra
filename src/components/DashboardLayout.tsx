@@ -9,7 +9,9 @@ import {
   Settings,
   PanelLeftClose,
   PanelLeft,
-  Scissors,
+  Scissors as ScissorsIcon,
+  Sparkles,
+  UserCog,
 } from "lucide-react";
 import { SidebarNavItem } from "@/components/SidebarNavItem";
 import { cn } from "@/lib/utils";
@@ -17,6 +19,8 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { to: "/", icon: CalendarDays, label: "Calendar" },
   { to: "/clients", icon: Users, label: "Clients" },
+  { to: "/services", icon: Sparkles, label: "Services" },
+  { to: "/staff", icon: UserCog, label: "Employees" },
   { to: "/inventory", icon: Package, label: "Inventory" },
   { to: "/marketing", icon: Megaphone, label: "Marketing" },
   { to: "/reports", icon: BarChart3, label: "Reports" },
@@ -38,7 +42,7 @@ export default function DashboardLayout() {
         {/* Logo */}
         <div className="flex h-16 items-center gap-2.5 border-b border-border/50 px-4">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary">
-            <Scissors className="h-4 w-4 text-primary-foreground" strokeWidth={1.5} />
+            <ScissorsIcon className="h-4 w-4 text-primary-foreground" strokeWidth={1.5} />
           </div>
           {!collapsed && (
             <span className="text-base font-semibold tracking-tight text-foreground">
