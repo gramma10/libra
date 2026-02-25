@@ -14,9 +14,10 @@ interface DayViewProps {
   staff: any[];
   appointments: any[];
   onCellClick: (staffId: string, hour: number, minutes: number) => void;
+  onAppointmentClick?: (appointment: any) => void;
 }
 
-export default function DayView({ date, staff, appointments, onCellClick }: DayViewProps) {
+export default function DayView({ date, staff, appointments, onCellClick, onAppointmentClick }: DayViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -67,7 +68,7 @@ export default function DayView({ date, staff, appointments, onCellClick }: DayV
               const height = ((end.getTime() - start.getTime()) / 3600000) * HOUR_HEIGHT;
               const color = appt.services?.category_color || "#6366f1";
               return (
-                <div key={appt.id} className="absolute rounded-lg p-2 cursor-pointer transition-all hover:shadow-lg hover:brightness-110 text-white z-10 overflow-hidden"
+                <div key={appt.id} onClick={() => onAppointmentClick?.(appt)} className="absolute rounded-lg p-2 cursor-pointer transition-all hover:shadow-lg hover:brightness-110 text-white z-10 overflow-hidden"
                   style={{
                     top: `${topOffset + 1}px`, height: `${Math.max(height - 2, 24)}px`,
                     left: `calc(64px + (100% - 64px) * ${colIndex} / ${staff.length} + 3px)`,
