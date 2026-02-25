@@ -7,6 +7,7 @@ import DayView from "@/components/calendar/DayView";
 import WeekView from "@/components/calendar/WeekView";
 import MonthView from "@/components/calendar/MonthView";
 import NewBookingDialog from "@/components/calendar/NewBookingDialog";
+import EditBookingDialog from "@/components/calendar/EditBookingDialog";
 
 const today = new Date();
 
@@ -21,6 +22,7 @@ export default function CalendarPage() {
   const [prefillStaffId, setPrefillStaffId] = useState("");
   const [prefillTime, setPrefillTime] = useState("");
   const [bookingDate, setBookingDate] = useState(currentDate);
+  const [editingAppointment, setEditingAppointment] = useState<any | null>(null);
 
   const getDateRange = () => {
     if (view === "day") {
@@ -90,7 +92,7 @@ export default function CalendarPage() {
         staff.length === 0 ? (
           <div className="flex-1 flex items-center justify-center"><p className="text-muted-foreground text-sm">Add employees first to see the calendar columns.</p></div>
         ) : (
-          <DayView date={currentDate} staff={staff} appointments={appointments} onCellClick={handleCellClick} />
+          <DayView date={currentDate} staff={staff} appointments={appointments} onCellClick={handleCellClick} onAppointmentClick={(appt) => setEditingAppointment(appt)} />
         )
       ) : view === "week" ? (
         <WeekView date={currentDate} appointments={appointments} onCellClick={handleCellClick} />
@@ -99,6 +101,7 @@ export default function CalendarPage() {
       )}
 
       <NewBookingDialog open={showNewBooking} onOpenChange={setShowNewBooking} currentDate={bookingDate} prefillStaffId={prefillStaffId} prefillTime={prefillTime} services={services} staff={staff} onCreated={fetchData} />
+      <EditBookingDialog open={!!editingAppointment} onOpenChange={(open) => { if (!open) setEditingAppointment(null); }} appointment={editingAppointment} services={services} staff={staff} onUpdated={fetchData} />
     </motion.div>
   );
 }
