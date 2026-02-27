@@ -1,13 +1,12 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Scissors, ChevronRight, Calendar, Clock, Check, Loader2, User } from "lucide-react";
+import { Scissors, ChevronRight, Calendar, Clock, Check, Loader2, User, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-// Generate time slots every 15 minutes from 09:00 to 20:00
 const generateTimeSlots = () => {
   const slots: string[] = [];
   for (let h = 9; h < 20; h++) {
@@ -27,6 +26,8 @@ const DATES = Array.from({ length: 7 }, (_, i) => {
 
 type Step = "service" | "barber" | "date" | "time" | "info" | "confirm";
 
+const ANYONE_STAFF = { id: "anyone", first_name: "Anyone", last_name: "", role: "No Preference" };
+
 export default function BookingWidget() {
   const [step, setStep] = useState<Step>("service");
   const [services, setServices] = useState<any[]>([]);
@@ -38,8 +39,9 @@ export default function BookingWidget() {
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [clientInfo, setClientInfo] = useState({ first_name: "", last_name: "", phone_mobile: "" });
   const [submitting, setSubmitting] = useState(false);
-  const [bookedSlots, setBookedSlots] = useState<{ start: Date; end: Date }[]>([]);
+  const [bookedSlots, setBookedSlots] = useState<{ start: Date; end: Date; staffId: string }[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
+  const [assignedStaffId, setAssignedStaffId] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -61,13 +63,24 @@ export default function BookingWidget() {
       dayStart.setHours(0, 0, 0, 0);
       const dayEnd = new Date(selectedDate);
       dayEnd.setHours(23, 59, 59, 999);
-      const { data } = await supabase
-        .from("appointments")
-        .select("start_time, end_time")
-        .eq("staff_id", selectedStaff.id)
-        .gte("start_time", dayStart.toISOString())
-        .lte("start_time", dayEnd.toISOString());
-      setBookedSlots((data || []).map((a: any) => ({ start: new Date(a.start_time), end: new Date(a.end_time) })));
+
+      if (selectedStaff.id === "anyone") {
+        // Fetch all staff appointments for this day
+        const { data } = await supabase
+          .from("appointments")
+          .select("start_time, end_time, staff_id")
+          .gte("start_time", dayStart.toISOString())
+          .lte("start_time", dayEnd.toISOString());
+        setBookedSlots((data || []).map((a: any) => ({ start: new Date(a.start_time), end: new Date(a.end_time), staffId: a.staff_id })));
+      } else {
+        const { data } = await supabase
+          .from("appointments")
+          .select("start_time, end_time, staff_id")
+          .eq("staff_id", selectedStaff.id)
+          .gte("start_time", dayStart.toISOString())
+          .lte("start_time", dayEnd.toISOString());
+        setBookedSlots((data || []).map((a: any) => ({ start: new Date(a.start_time), end: new Date(a.end_time), staffId: a.staff_id })));
+      }
       setLoadingSlots(false);
     };
     fetchSlots();
@@ -77,35 +90,71 @@ export default function BookingWidget() {
     if (!selectedDate || !selectedService) return true;
     const slotStart = new Date(`${selectedDate.toISOString().split("T")[0]}T${time}:00`);
     const slotEnd = new Date(slotStart.getTime() + selectedService.duration * 60000);
+
+    if (selectedStaff?.id === "anyone") {
+      // Available if ANY staff member is free
+      return staffList.some((staff) => {
+        const staffSlots = bookedSlots.filter((b) => b.staffId === staff.id);
+        return !staffSlots.some((b) => slotStart < b.end && slotEnd > b.start);
+      });
+    }
+
     return !bookedSlots.some((b) => slotStart < b.end && slotEnd > b.start);
+  };
+
+  // Find the first available staff for "anyone" at a given time
+  const findAvailableStaff = (time: string): any | null => {
+    if (!selectedDate || !selectedService) return null;
+    const slotStart = new Date(`${selectedDate.toISOString().split("T")[0]}T${time}:00`);
+    const slotEnd = new Date(slotStart.getTime() + selectedService.duration * 60000);
+    for (const staff of staffList) {
+      const staffSlots = bookedSlots.filter((b) => b.staffId === staff.id);
+      if (!staffSlots.some((b) => slotStart < b.end && slotEnd > b.start)) {
+        return staff;
+      }
+    }
+    return null;
   };
 
   const steps: Step[] = ["service", "barber", "date", "time", "info", "confirm"];
   const stepIndex = steps.indexOf(step);
 
+  const handleTimeSelect = (time: string) => {
+    setSelectedTime(time);
+    if (selectedStaff?.id === "anyone") {
+      const available = findAvailableStaff(time);
+      setAssignedStaffId(available?.id || null);
+    } else {
+      setAssignedStaffId(selectedStaff?.id || null);
+    }
+    setStep("info");
+  };
+
   const handleConfirm = async () => {
-    if (!selectedService || !selectedDate || !selectedTime || !selectedStaff || !clientInfo.first_name || !clientInfo.phone_mobile) return;
+    if (!selectedService || !selectedDate || !selectedTime || !clientInfo.first_name || !clientInfo.phone_mobile) return;
+    const staffIdToUse = assignedStaffId;
     setSubmitting(true);
 
     const startDt = new Date(`${selectedDate.toISOString().split("T")[0]}T${selectedTime}:00`);
     const endDt = new Date(startDt.getTime() + selectedService.duration * 60000);
 
-    // Final overlap check before booking
-    const { data: overlapping } = await supabase
-      .from("appointments")
-      .select("id")
-      .eq("staff_id", selectedStaff.id)
-      .lt("start_time", endDt.toISOString())
-      .gt("end_time", startDt.toISOString())
-      .limit(1);
+    // Final overlap check
+    if (staffIdToUse) {
+      const { data: overlapping } = await supabase
+        .from("appointments")
+        .select("id")
+        .eq("staff_id", staffIdToUse)
+        .lt("start_time", endDt.toISOString())
+        .gt("end_time", startDt.toISOString())
+        .limit(1);
 
-    if (overlapping && overlapping.length > 0) {
-      toast.error("This slot was just booked. Please choose another time.");
-      setSubmitting(false);
-      setStep("time");
-      // Refresh booked slots
-      setSelectedDate(new Date(selectedDate));
-      return;
+      if (overlapping && overlapping.length > 0) {
+        toast.error("This slot was just booked. Please choose another time.");
+        setSubmitting(false);
+        setStep("time");
+        setSelectedDate(new Date(selectedDate));
+        return;
+      }
     }
 
     let clientId: string;
@@ -130,7 +179,7 @@ export default function BookingWidget() {
     const { error } = await supabase.from("appointments").insert({
       client_id: clientId,
       service_id: selectedService.id,
-      staff_id: selectedStaff.id,
+      staff_id: staffIdToUse || null,
       start_time: startDt.toISOString(),
       end_time: endDt.toISOString(),
     });
@@ -141,6 +190,14 @@ export default function BookingWidget() {
       setStep("confirm");
     }
     setSubmitting(false);
+  };
+
+  const getConfirmStaffName = () => {
+    if (selectedStaff?.id === "anyone") {
+      const staff = staffList.find((s) => s.id === assignedStaffId);
+      return staff ? `${staff.first_name} ${staff.last_name}` : "Any Available";
+    }
+    return `${selectedStaff?.first_name} ${selectedStaff?.last_name}`;
   };
 
   if (loading) {
@@ -187,7 +244,23 @@ export default function BookingWidget() {
 
             {step === "barber" && (
               <motion.div key="barber" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="p-6 space-y-4">
-                <h2 className="text-lg font-semibold flex items-center gap-2"><User className="h-5 w-5" strokeWidth={1.5} />Choose your barber</h2>
+                <h2 className="text-lg font-semibold flex items-center gap-2"><User className="h-5 w-5" strokeWidth={1.5} />Choose a Professional</h2>
+
+                {/* Anyone / No Preference card */}
+                <button
+                  onClick={() => { setSelectedStaff(ANYONE_STAFF); setStep("date"); }}
+                  className="flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all border-2 border-primary/20 bg-primary/5 hover:border-primary/50"
+                >
+                  <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Users className="h-5 w-5 text-primary" strokeWidth={1.5} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold">No Preference</p>
+                    <p className="text-xs text-muted-foreground">First available professional</p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
+                </button>
+
                 {staffList.length === 0 && <p className="text-sm text-muted-foreground">No barbers available.</p>}
                 <div className="grid grid-cols-2 gap-3">
                   {staffList.map((s: any) => (
@@ -231,7 +304,7 @@ export default function BookingWidget() {
                     {TIME_SLOTS.map((time) => {
                       const available = isSlotAvailable(time);
                       return (
-                        <button key={time} onClick={() => { if (available) { setSelectedTime(time); setStep("info"); } }}
+                        <button key={time} onClick={() => { if (available) handleTimeSelect(time); }}
                           disabled={!available}
                           className={cn(
                             "rounded-xl py-2.5 text-sm font-medium border transition-all",
@@ -281,11 +354,11 @@ export default function BookingWidget() {
                 <h2 className="text-lg font-semibold">Booking Confirmed!</h2>
                 <div className="rounded-xl bg-muted p-4 text-sm space-y-1">
                   <p><span className="text-muted-foreground">Service:</span> <span className="font-medium">{selectedService?.service_name}</span></p>
-                  <p><span className="text-muted-foreground">Barber:</span> <span className="font-medium">{selectedStaff?.first_name} {selectedStaff?.last_name}</span></p>
+                  <p><span className="text-muted-foreground">Professional:</span> <span className="font-medium">{getConfirmStaffName()}</span></p>
                   <p><span className="text-muted-foreground">Date:</span> <span className="font-medium">{selectedDate?.toLocaleDateString("en", { weekday: "long", month: "long", day: "numeric" })}</span></p>
                   <p><span className="text-muted-foreground">Time:</span> <span className="font-medium">{selectedTime}</span></p>
                 </div>
-                <Button className="rounded-xl px-8" onClick={() => { setStep("service"); setSelectedService(null); setSelectedStaff(null); setSelectedDate(null); setSelectedTime(null); }}>
+                <Button className="rounded-xl px-8" onClick={() => { setStep("service"); setSelectedService(null); setSelectedStaff(null); setSelectedDate(null); setSelectedTime(null); setAssignedStaffId(null); }}>
                   Book Another
                 </Button>
               </motion.div>
