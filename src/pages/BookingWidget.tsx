@@ -7,7 +7,17 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-const TIME_SLOTS = ["09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30"];
+// Generate time slots every 15 minutes from 09:00 to 20:00
+const generateTimeSlots = () => {
+  const slots: string[] = [];
+  for (let h = 9; h < 20; h++) {
+    for (let m = 0; m < 60; m += 15) {
+      slots.push(`${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`);
+    }
+  }
+  return slots;
+};
+const TIME_SLOTS = generateTimeSlots();
 
 const DATES = Array.from({ length: 7 }, (_, i) => {
   const d = new Date();
@@ -77,6 +87,27 @@ export default function BookingWidget() {
     if (!selectedService || !selectedDate || !selectedTime || !selectedStaff || !clientInfo.first_name || !clientInfo.phone_mobile) return;
     setSubmitting(true);
 
+    const startDt = new Date(`${selectedDate.toISOString().split("T")[0]}T${selectedTime}:00`);
+    const endDt = new Date(startDt.getTime() + selectedService.duration * 60000);
+
+    // Final overlap check before booking
+    const { data: overlapping } = await supabase
+      .from("appointments")
+      .select("id")
+      .eq("staff_id", selectedStaff.id)
+      .lt("start_time", endDt.toISOString())
+      .gt("end_time", startDt.toISOString())
+      .limit(1);
+
+    if (overlapping && overlapping.length > 0) {
+      toast.error("This slot was just booked. Please choose another time.");
+      setSubmitting(false);
+      setStep("time");
+      // Refresh booked slots
+      setSelectedDate(new Date(selectedDate));
+      return;
+    }
+
     let clientId: string;
     const { data: existing } = await supabase.from("clients").select("id").eq("phone_mobile", clientInfo.phone_mobile).limit(1).single();
 
@@ -95,9 +126,6 @@ export default function BookingWidget() {
       }
       clientId = newClient.id;
     }
-
-    const startDt = new Date(`${selectedDate.toISOString().split("T")[0]}T${selectedTime}:00`);
-    const endDt = new Date(startDt.getTime() + selectedService.duration * 60000);
 
     const { error } = await supabase.from("appointments").insert({
       client_id: clientId,

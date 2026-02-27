@@ -65,6 +65,28 @@ export default function NewBookingDialog({ open, onOpenChange, currentDate, pref
     if (isNewClient && (!newFirstName || !newLastName)) { toast.error("Enter the client's name"); return; }
 
     setSaving(true);
+
+    const service = services.find((s: any) => s.id === serviceId);
+    const startDt = new Date(`${currentDate.toISOString().split("T")[0]}T${startTime}:00`);
+    const endDt = new Date(startDt.getTime() + (service?.duration || 30) * 60000);
+
+    // Check for overlapping appointments for the same staff member
+    if (staffId) {
+      const { data: overlapping } = await supabase
+        .from("appointments")
+        .select("id")
+        .eq("staff_id", staffId)
+        .lt("start_time", endDt.toISOString())
+        .gt("end_time", startDt.toISOString())
+        .limit(1);
+
+      if (overlapping && overlapping.length > 0) {
+        toast.error("This time slot overlaps with an existing appointment for this employee.");
+        setSaving(false);
+        return;
+      }
+    }
+
     let clientId = clientMatch?.id;
 
     // Create new client if needed
@@ -73,10 +95,6 @@ export default function NewBookingDialog({ open, onOpenChange, currentDate, pref
       if (error) { toast.error(error.message); setSaving(false); return; }
       clientId = data.id;
     }
-
-    const service = services.find((s: any) => s.id === serviceId);
-    const startDt = new Date(`${currentDate.toISOString().split("T")[0]}T${startTime}:00`);
-    const endDt = new Date(startDt.getTime() + (service?.duration || 30) * 60000);
 
     const { error } = await supabase.from("appointments").insert({
       client_id: clientId,
