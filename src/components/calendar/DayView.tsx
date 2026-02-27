@@ -66,9 +66,10 @@ export default function DayView({ date, staff, appointments, onCellClick, onAppo
               const end = new Date(appt.end_time);
               const topOffset = (start.getHours() + start.getMinutes() / 60 - HOURS[0]) * HOUR_HEIGHT;
               const height = ((end.getTime() - start.getTime()) / 3600000) * HOUR_HEIGHT;
-              const color = appt.services?.category_color || "#6366f1";
+              const isNoShow = appt.status === "No-Show";
+              const color = isNoShow ? "hsl(0 0% 60%)" : (appt.services?.category_color || "#6366f1");
               return (
-                <div key={appt.id} onClick={() => onAppointmentClick?.(appt)} className="absolute rounded-lg p-2 cursor-pointer transition-all hover:shadow-lg hover:brightness-110 text-white z-10 overflow-hidden"
+                <div key={appt.id} onClick={() => onAppointmentClick?.(appt)} className={`absolute rounded-lg p-2 cursor-pointer transition-all hover:shadow-lg z-10 overflow-hidden ${isNoShow ? "opacity-60" : "hover:brightness-110"} text-white`}
                   style={{
                     top: `${topOffset + 1}px`, height: `${Math.max(height - 2, 24)}px`,
                     left: `calc(64px + (100% - 64px) * ${colIndex} / ${staff.length} + 3px)`,

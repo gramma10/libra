@@ -5,12 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Constants } from "@/integrations/supabase/types";
-
-const STATUSES = Constants.public.Enums.appointment_status;
 
 interface EditBookingDialogProps {
   open: boolean;
@@ -25,9 +21,8 @@ export default function EditBookingDialog({ open, onOpenChange, appointment, ser
   const [serviceId, setServiceId] = useState("");
   const [staffId, setStaffId] = useState("");
   const [startTime, setStartTime] = useState("");
-  const [status, setStatus] = useState("Pending");
   const [internalNotes, setInternalNotes] = useState("");
-  const [isPaid, setIsPaid] = useState(false);
+  const [isNoShow, setIsNoShow] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -38,9 +33,8 @@ export default function EditBookingDialog({ open, onOpenChange, appointment, ser
     setStaffId(appointment.staff_id || "");
     const start = new Date(appointment.start_time);
     setStartTime(`${start.getHours().toString().padStart(2, "0")}:${start.getMinutes().toString().padStart(2, "0")}`);
-    setStatus(appointment.status || "Pending");
     setInternalNotes(appointment.internal_notes || "");
-    setIsPaid(appointment.is_paid || false);
+    setIsNoShow(appointment.status === "No-Show");
     setConfirmDelete(false);
   }, [appointment, open]);
 
@@ -57,9 +51,9 @@ export default function EditBookingDialog({ open, onOpenChange, appointment, ser
       staff_id: staffId || null,
       start_time: startDt.toISOString(),
       end_time: endDt.toISOString(),
-      status: status as any,
+      status: (isNoShow ? "No-Show" : "Confirmed") as any,
       internal_notes: internalNotes,
-      is_paid: isPaid,
+      is_paid: !isNoShow,
     }).eq("id", appointment.id);
 
     if (error) toast.error(error.message);
@@ -125,22 +119,9 @@ export default function EditBookingDialog({ open, onOpenChange, appointment, ser
             </Select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Time</label>
-              <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="rounded-xl" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Status</label>
-              <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {STATUSES.map((s) => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Time</label>
+            <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="rounded-xl" />
           </div>
 
           <div className="space-y-2">
@@ -148,10 +129,13 @@ export default function EditBookingDialog({ open, onOpenChange, appointment, ser
             <Textarea value={internalNotes} onChange={(e) => setInternalNotes(e.target.value)} className="rounded-xl" rows={2} placeholder="Notes visible only to staff..." />
           </div>
 
-          <div className="flex items-center justify-between rounded-xl border border-border p-3">
-            <label className="text-sm font-medium">Paid</label>
-            <Switch checked={isPaid} onCheckedChange={setIsPaid} />
-          </div>
+          <Button
+            variant={isNoShow ? "default" : "outline"}
+            className={`w-full rounded-xl ${isNoShow ? "bg-muted-foreground text-background hover:bg-muted-foreground/80" : ""}`}
+            onClick={() => setIsNoShow(!isNoShow)}
+          >
+            {isNoShow ? "Marked as No-Show" : "Mark as No-Show"}
+          </Button>
 
           <div className="flex gap-3">
             {!confirmDelete ? (
