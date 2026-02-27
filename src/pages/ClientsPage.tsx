@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Search, Plus, Phone, Mail, ChevronRight, Loader2 } from "lucide-react";
+import { Search, Plus, Phone, Mail, ChevronRight, Loader2, CalendarDays, DollarSign, UserX, Clock } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -17,6 +17,8 @@ export default function ClientsPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ first_name: "", last_name: "", phone_mobile: "", email: "", tech_notes: "", personal_preferences: "" });
+  const [clientAppointments, setClientAppointments] = useState<any[]>([]);
+  const [loadingAppts, setLoadingAppts] = useState(false);
 
   const fetchClients = async () => {
     setLoading(true);
@@ -28,9 +30,57 @@ export default function ClientsPage() {
 
   useEffect(() => { fetchClients(); }, []);
 
+  // Fetch appointments for selected client
+  useEffect(() => {
+    if (!selected) return;
+    const fetchAppts = async () => {
+      setLoadingAppts(true);
+      const { data } = await supabase
+        .from("appointments")
+        .select("id, start_time, end_time, status, is_paid, services(price, service_name)")
+        .eq("client_id", selected.id)
+        .order("start_time", { ascending: false });
+      setClientAppointments(data || []);
+      setLoadingAppts(false);
+    };
+    fetchAppts();
+  }, [selected?.id]);
+
   const filtered = clients.filter((c) =>
     `${c.first_name} ${c.last_name}`.toLowerCase().includes(search.toLowerCase())
   );
+
+  const analytics = useMemo(() => {
+    if (!clientAppointments.length) return { totalAppts: 0, revenue: 0, lastVisitDays: null as number | null, noShows: 0 };
+    const now = new Date();
+
+    // Total appointments: exclude cancelled, include no-shows
+    const validAppts = clientAppointments.filter((a) => a.status !== "Cancelled");
+    const noShows = validAppts.filter((a) => a.status === "No-Show").length;
+
+    // Revenue: price of completed OR (past end_time AND not no-show/cancelled)
+    const revenue = clientAppointments.reduce((sum, a) => {
+      if (a.status === "Cancelled" || a.status === "No-Show") return sum;
+      const endTime = new Date(a.end_time);
+      if (a.status === "Completed" || endTime < now) {
+        return sum + (a.services?.price || 0);
+      }
+      return sum;
+    }, 0);
+
+    // Last visit: most recent past appointment that's not cancelled/no-show
+    const pastVisits = clientAppointments.filter((a) => {
+      if (a.status === "Cancelled" || a.status === "No-Show") return false;
+      return new Date(a.end_time) < now;
+    });
+    let lastVisitDays: number | null = null;
+    if (pastVisits.length > 0) {
+      const lastDate = new Date(pastVisits[0].end_time);
+      lastVisitDays = Math.floor((now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+    }
+
+    return { totalAppts: validAppts.length, revenue, lastVisitDays, noShows };
+  }, [clientAppointments]);
 
   const handleAdd = async () => {
     if (!form.first_name || !form.last_name || !form.phone_mobile) {
@@ -82,7 +132,7 @@ export default function ClientsPage() {
                   <div>
                     <p className="text-sm font-medium">{client.first_name} {client.last_name}</p>
                     <p className={cn("text-xs mt-0.5", selected?.id === client.id ? "text-primary-foreground/70" : "text-muted-foreground")}>
-                      €{Number(client.total_spent).toFixed(0)} spent
+                      {client.phone_mobile}
                     </p>
                   </div>
                   <ChevronRight className="h-4 w-4 opacity-40" strokeWidth={1.5} />
@@ -101,11 +151,49 @@ export default function ClientsPage() {
                     {selected.email && <span className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" strokeWidth={1.5} />{selected.email}</span>}
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-2xl font-semibold">€{Number(selected.total_spent).toFixed(0)}</p>
-                  <p className="text-xs text-muted-foreground">Total spent</p>
-                </div>
               </div>
+
+              {/* Analytics Header */}
+              {loadingAppts ? (
+                <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+              ) : (
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-1">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <CalendarDays className="h-4 w-4" strokeWidth={1.5} />
+                      <span className="text-xs font-medium uppercase tracking-wide">Appointments</span>
+                    </div>
+                    <p className="text-2xl font-bold">{analytics.totalAppts}</p>
+                  </div>
+                  <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-1">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <DollarSign className="h-4 w-4" strokeWidth={1.5} />
+                      <span className="text-xs font-medium uppercase tracking-wide">Revenue (LTV)</span>
+                    </div>
+                    <p className="text-2xl font-bold">€{analytics.revenue.toFixed(0)}</p>
+                  </div>
+                  <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-1">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Clock className="h-4 w-4" strokeWidth={1.5} />
+                      <span className="text-xs font-medium uppercase tracking-wide">Last Visit</span>
+                    </div>
+                    <p className="text-2xl font-bold">
+                      {analytics.lastVisitDays !== null ? (
+                        <span className={analytics.lastVisitDays > 30 ? "text-destructive" : ""}>
+                          {analytics.lastVisitDays === 0 ? "Today" : `${analytics.lastVisitDays}d ago`}
+                        </span>
+                      ) : "—"}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-1">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <UserX className="h-4 w-4" strokeWidth={1.5} />
+                      <span className="text-xs font-medium uppercase tracking-wide">No-Shows</span>
+                    </div>
+                    <p className="text-2xl font-bold">{analytics.noShows}</p>
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-3">
@@ -125,8 +213,43 @@ export default function ClientsPage() {
               {selected.birthday && (
                 <p className="text-sm text-muted-foreground">🎂 Birthday: {new Date(selected.birthday).toLocaleDateString()}</p>
               )}
-              {selected.last_visit && (
-                <p className="text-sm text-muted-foreground">Last visit: {new Date(selected.last_visit).toLocaleDateString()}</p>
+
+              {/* Recent Appointments Table */}
+              {clientAppointments.length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Recent Appointments</h3>
+                  <div className="rounded-xl border border-border overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b bg-muted/50">
+                          <th className="px-4 py-2 text-left font-medium text-muted-foreground">Date</th>
+                          <th className="px-4 py-2 text-left font-medium text-muted-foreground">Service</th>
+                          <th className="px-4 py-2 text-left font-medium text-muted-foreground">Status</th>
+                          <th className="px-4 py-2 text-right font-medium text-muted-foreground">Price</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {clientAppointments.slice(0, 10).map((appt) => (
+                          <tr key={appt.id} className="border-b last:border-0">
+                            <td className="px-4 py-2">{new Date(appt.start_time).toLocaleDateString()}</td>
+                            <td className="px-4 py-2">{appt.services?.service_name || "—"}</td>
+                            <td className="px-4 py-2">
+                              <span className={cn(
+                                "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+                                appt.status === "No-Show" ? "bg-destructive/10 text-destructive" :
+                                appt.status === "Cancelled" ? "bg-muted text-muted-foreground" :
+                                "bg-primary/10 text-primary"
+                              )}>
+                                {appt.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2 text-right">€{(appt.services?.price || 0).toFixed(0)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               )}
             </motion.div>
           )}
