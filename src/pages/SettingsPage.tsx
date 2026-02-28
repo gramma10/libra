@@ -47,8 +47,13 @@ export default function SettingsPage() {
         text: `Test SMS from ${shopName || "your salon"}. Your reminder system is working!`,
       },
     });
-    if (error) toast.error("Failed to send test SMS");
-    else toast.success("Test SMS sent successfully!");
+    if (error) {
+      toast.error("Failed to send: " + error.message);
+    } else if (data?.error) {
+      toast.error(`SMS failed: ${data.error} (${data.details || 'no details'})`);
+    } else {
+      toast.success("Test SMS sent successfully!");
+    }
     setSendingTest(false);
   };
 
