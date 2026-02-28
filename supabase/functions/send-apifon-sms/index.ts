@@ -1,9 +1,34 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
+
+async function generateHmacSignature(
+  secretKey: string,
+  method: string,
+  uri: string,
+  body: string,
+  date: string
+): Promise<string> {
+  const stringToSign = `${method}\n${uri}\n${body}\n${date}`;
+  const encoder = new TextEncoder();
+  const keyData = encoder.encode(secretKey);
+  const msgData = encoder.encode(stringToSign);
+
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    keyData,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+
+  const signature = await crypto.subtle.sign("HMAC", cryptoKey, msgData);
+  return base64Encode(new Uint8Array(signature));
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -21,39 +46,52 @@ serve(async (req) => {
     }
 
     const apiToken = Deno.env.get('APIFON_API_TOKEN');
-    const apiKey = Deno.env.get('APIFON_API_KEY');
+    const apiSecret = Deno.env.get('APIFON_API_KEY');
 
-    if (!apiToken || !apiKey) {
-      console.error('Missing secrets - APIFON_API_TOKEN:', !!apiToken, 'APIFON_API_KEY:', !!apiKey);
+    if (!apiToken || !apiSecret) {
+      console.error('Missing secrets - APIFON_API_TOKEN:', !!apiToken, 'APIFON_API_KEY:', !!apiSecret);
       return new Response(JSON.stringify({ error: 'Apifon credentials not configured' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    console.log('Sending SMS to:', to, 'with sender:', senderId || 'SALON');
+    const requestBody = JSON.stringify({
+      sender_id: senderId || 'SALON',
+      recipients: [{ number: to }],
+      body: { text },
+    });
 
-    // Apifon SMS API call
-    const response = await fetch('https://ars.apifon.com/services/api/v1/sms/send', {
-      method: 'POST',
+    const method = 'POST';
+    const uri = '/services/api/v1/sms/send';
+    const date = new Date().toUTCString();
+
+    const signature = await generateHmacSignature(apiSecret, method, uri, requestBody, date);
+
+    console.log('Sending SMS to:', to, 'with sender:', senderId || 'SALON');
+    console.log('Date header:', date);
+    console.log('URI:', uri);
+
+    const response = await fetch(`https://ars.apifon.com${uri}`, {
+      method,
       headers: {
         'Content-Type': 'application/json',
-        'X-ApiToken': apiToken,
-        'X-ApiKey': apiKey,
+        'X-ApifonWS-Date': date,
+        'Authorization': `ApifonWS ${apiToken}:${signature}`,
       },
-      body: JSON.stringify({
-        sender_id: senderId || 'SALON',
-        recipients: [{ number: to }],
-        body: { text },
-      }),
+      body: requestBody,
     });
 
     const result = await response.text();
     console.log('Apifon response status:', response.status, 'body:', result);
 
     if (!response.ok) {
-      return new Response(JSON.stringify({ error: 'SMS send failed', details: result, status: response.status }), {
-        status: 200, // Return 200 to client so we can see the error details
+      return new Response(JSON.stringify({ 
+        error: 'SMS send failed', 
+        details: result, 
+        status: response.status 
+      }), {
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
