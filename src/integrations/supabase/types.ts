@@ -22,6 +22,7 @@ export type Database = {
           id: string
           internal_notes: string | null
           is_paid: boolean
+          reminder_sent: boolean
           service_id: string | null
           staff_id: string | null
           start_time: string
@@ -34,6 +35,7 @@ export type Database = {
           id?: string
           internal_notes?: string | null
           is_paid?: boolean
+          reminder_sent?: boolean
           service_id?: string | null
           staff_id?: string | null
           start_time: string
@@ -46,6 +48,7 @@ export type Database = {
           id?: string
           internal_notes?: string | null
           is_paid?: boolean
+          reminder_sent?: boolean
           service_id?: string | null
           staff_id?: string | null
           start_time?: string
@@ -70,32 +73,38 @@ export type Database = {
       }
       business_settings: {
         Row: {
+          apifon_sender_id: string | null
           brand_color_primary: string
           created_at: string
           google_review_url: string | null
           id: string
           logo_url: string | null
           shop_name: string
+          sms_enabled: boolean
           sms_provider_api: string | null
           theme_style: Database["public"]["Enums"]["theme_style"]
         }
         Insert: {
+          apifon_sender_id?: string | null
           brand_color_primary?: string
           created_at?: string
           google_review_url?: string | null
           id?: string
           logo_url?: string | null
           shop_name?: string
+          sms_enabled?: boolean
           sms_provider_api?: string | null
           theme_style?: Database["public"]["Enums"]["theme_style"]
         }
         Update: {
+          apifon_sender_id?: string | null
           brand_color_primary?: string
           created_at?: string
           google_review_url?: string | null
           id?: string
           logo_url?: string | null
           shop_name?: string
+          sms_enabled?: boolean
           sms_provider_api?: string | null
           theme_style?: Database["public"]["Enums"]["theme_style"]
         }
