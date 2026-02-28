@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Loader2, Trash2 } from "lucide-react";
+import { Loader2, Trash2, Bell, BellOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -91,8 +91,16 @@ export default function EditBookingDialog({ open, onOpenChange, appointment, ser
         <div className="space-y-4">
           {/* Client info (read-only) */}
           <div className="rounded-xl bg-muted p-3">
-            <p className="text-sm font-medium">{clientName || "Unknown Client"}</p>
-            <p className="text-xs text-muted-foreground">Client</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">{clientName || "Unknown Client"}</p>
+                <p className="text-xs text-muted-foreground">Client</p>
+              </div>
+              <div className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${appointment.reminder_sent ? 'bg-primary/10 text-primary' : 'bg-muted-foreground/10 text-muted-foreground'}`}>
+                {appointment.reminder_sent ? <Bell className="h-3 w-3" /> : <BellOff className="h-3 w-3" />}
+                {appointment.reminder_sent ? 'Reminder Sent' : 'No Reminder'}
+              </div>
+            </div>
           </div>
 
           <div className="space-y-2">

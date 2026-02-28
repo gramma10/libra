@@ -1,1 +1,7 @@
 project_id = "pykyijuvjzvktdywgszw"
+
+[functions.send-apifon-sms]
+verify_jwt = false
+
+[functions.check-reminders]
+verify_jwt = false

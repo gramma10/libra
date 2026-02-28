@@ -1,4 +1,5 @@
 import { useRef, useEffect } from "react";
+import { Bell } from "lucide-react";
 
 const HOURS = Array.from({ length: 14 }, (_, i) => i + 7); // 7 AM - 8 PM
 const HOUR_HEIGHT = 64;
@@ -76,7 +77,10 @@ export default function DayView({ date, staff, appointments, onCellClick, onAppo
                     width: `calc((100% - 64px) / ${staff.length} - 6px)`,
                     backgroundColor: color,
                   }}>
-                  <p className="text-xs font-semibold leading-tight truncate">{appt.clients?.first_name} {appt.clients?.last_name}</p>
+                  <div className="flex items-center gap-1">
+                    <p className="text-xs font-semibold leading-tight truncate">{appt.clients?.first_name} {appt.clients?.last_name}</p>
+                    {appt.reminder_sent && <Bell className="h-3 w-3 flex-shrink-0 opacity-80" />}
+                  </div>
                   {height > 32 && <p className="text-[10px] opacity-80 mt-0.5 truncate">{appt.services?.service_name}</p>}
                 </div>
               );
