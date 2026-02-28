@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Upload, Palette, Layout, ExternalLink, Loader2, LogOut, MessageSquare } from "lucide-react";
+import { Upload, Palette, Layout, ExternalLink, Loader2, LogOut, MessageSquare, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -31,6 +31,27 @@ export default function SettingsPage() {
   const [googleReviewUrl, setGoogleReviewUrl] = useState("");
   const [smsEnabled, setSmsEnabled] = useState(false);
   const [apifonSenderId, setApifonSenderId] = useState("");
+  const [testPhone, setTestPhone] = useState("");
+  const [sendingTest, setSendingTest] = useState(false);
+
+  const handleSendTestSms = async () => {
+    if (!testPhone) {
+      toast.error("Please enter a phone number");
+      return;
+    }
+    setSendingTest(true);
+    const { data, error } = await supabase.functions.invoke("send-apifon-sms", {
+      body: {
+        to: testPhone,
+        senderId: apifonSenderId || "SALON",
+        text: `Test SMS from ${shopName || "your salon"}. Your reminder system is working!`,
+      },
+    });
+    if (error) toast.error("Failed to send test SMS");
+    else toast.success("Test SMS sent successfully!");
+    setSendingTest(false);
+  };
+
   useEffect(() => {
     const fetch = async () => {
       const { data } = await supabase.from("business_settings").select("*").limit(1).single();
@@ -148,6 +169,17 @@ export default function SettingsPage() {
             <label className="text-sm font-medium">Apifon Sender ID</label>
             <Input value={apifonSenderId} onChange={(e) => setApifonSenderId(e.target.value)} className="rounded-xl max-w-sm" placeholder="SALON" />
             <p className="text-xs text-muted-foreground">The name recipients see when they receive the SMS (max 11 chars)</p>
+          </div>
+          <div className="border-t border-border pt-4 space-y-2">
+            <label className="text-sm font-medium">Send Test SMS</label>
+            <div className="flex gap-2 max-w-sm">
+              <Input value={testPhone} onChange={(e) => setTestPhone(e.target.value)} className="rounded-xl" placeholder="+30 697 000 0000" />
+              <Button variant="outline" className="rounded-xl gap-2 shrink-0" onClick={handleSendTestSms} disabled={sendingTest}>
+                {sendingTest ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                Send
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">Enter your phone number to verify the SMS integration</p>
           </div>
         </div>
       </div>
