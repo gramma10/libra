@@ -57,10 +57,9 @@ serve(async (req) => {
     }
 
     const requestBody = JSON.stringify({
-      subscribers: [{ number: to }],
-      message: { text },
-      sender: senderId || 'SALON',
-      type: 'sms',
+      senderId: senderId || 'SALON',
+      recipients: [{ number: to }],
+      body: { text },
     });
 
     const method = 'POST';
