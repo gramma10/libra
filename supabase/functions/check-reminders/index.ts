@@ -6,6 +6,18 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+function ensureCountryPrefix(phone: string): string {
+  const cleaned = phone.replace(/\s+/g, '').replace(/[^0-9+]/g, '');
+  // Remove leading + if present
+  const digits = cleaned.startsWith('+') ? cleaned.slice(1) : cleaned;
+  // If already starts with 30, return as-is
+  if (digits.startsWith('30')) {
+    return digits;
+  }
+  // Otherwise prepend 30
+  return '30' + digits;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -17,13 +29,13 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     const now = new Date();
-    const from = new Date(now.getTime() + 50 * 60 * 1000); // 50 min from now
-    const to = new Date(now.getTime() + 70 * 60 * 1000);   // 70 min from now
+    const from = new Date(now.getTime() + 50 * 60 * 1000);
+    const to = new Date(now.getTime() + 70 * 60 * 1000);
 
     // Get business settings
     const { data: settings } = await supabase
       .from('business_settings')
-      .select('shop_name, sms_enabled, apifon_sender_id')
+      .select('shop_name, sms_enabled')
       .limit(1)
       .single();
 
@@ -33,7 +45,7 @@ serve(async (req) => {
       });
     }
 
-    // Find appointments needing reminders
+    // Find appointments needing reminders (50-70 min from now, reminder_sent = false)
     const { data: appointments, error } = await supabase
       .from('appointments')
       .select('id, start_time, client_id, clients(first_name, phone_mobile)')
@@ -57,13 +69,13 @@ serve(async (req) => {
       const client = (appt as any).clients;
       if (!client?.phone_mobile) continue;
 
+      const phoneNumber = ensureCountryPrefix(client.phone_mobile);
       const text = `Υπενθύμιση: Έχετε ραντεβού σε 1 ώρα στο ${settings.shop_name}. Σας περιμένουμε!`;
 
-      // Call the send-apifon-sms function
+      // Call send-apifon-sms with minimal payload (subscribers + message only)
       const { error: smsError } = await supabase.functions.invoke('send-apifon-sms', {
         body: {
-          to: client.phone_mobile,
-          senderId: settings.apifon_sender_id || 'SALON',
+          to: phoneNumber,
           text,
         },
       });
@@ -73,7 +85,7 @@ serve(async (req) => {
         continue;
       }
 
-      // Mark as sent
+      // Mark as sent immediately after success
       await supabase
         .from('appointments')
         .update({ reminder_sent: true })
