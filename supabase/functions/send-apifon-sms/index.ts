@@ -57,7 +57,7 @@ serve(async (req) => {
     }
 
     const requestBody = JSON.stringify({
-      sender_id: senderId || 'SALON',
+      senderId: senderId || 'SALON',
       recipients: [{ number: to }],
       body: { text },
     });
