@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Upload, Palette, Layout, ExternalLink, Loader2, LogOut } from "lucide-react";
+import { Upload, Palette, Layout, ExternalLink, Loader2, LogOut, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -28,7 +29,8 @@ export default function SettingsPage() {
   const [selectedStyle, setSelectedStyle] = useState<string>("Minimal");
   const [selectedColor, setSelectedColor] = useState(BRAND_COLORS[0]);
   const [googleReviewUrl, setGoogleReviewUrl] = useState("");
-
+  const [smsEnabled, setSmsEnabled] = useState(false);
+  const [apifonSenderId, setApifonSenderId] = useState("");
   useEffect(() => {
     const fetch = async () => {
       const { data } = await supabase.from("business_settings").select("*").limit(1).single();
@@ -37,7 +39,8 @@ export default function SettingsPage() {
         setShopName(data.shop_name);
         setSelectedStyle(data.theme_style);
         setGoogleReviewUrl(data.google_review_url || "");
-        // Try to match brand color
+        setSmsEnabled(data.sms_enabled || false);
+        setApifonSenderId(data.apifon_sender_id || "");
         const hslMatch = BRAND_COLORS.find((c) => `hsl(${c})` === data.brand_color_primary || `#${c}` === data.brand_color_primary);
         if (hslMatch) setSelectedColor(hslMatch);
       }
@@ -53,6 +56,8 @@ export default function SettingsPage() {
       brand_color_primary: `hsl(${selectedColor})`,
       theme_style: selectedStyle as any,
       google_review_url: googleReviewUrl,
+      sms_enabled: smsEnabled,
+      apifon_sender_id: apifonSenderId,
     };
 
     if (settingsId) {
@@ -123,6 +128,27 @@ export default function SettingsPage() {
               <p className="text-sm font-medium">{style}</p>
             </button>
           ))}
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <label className="text-sm font-medium flex items-center gap-2">
+          <MessageSquare className="h-4 w-4" strokeWidth={1.5} />
+          SMS – 24h Appointment Reminder
+        </label>
+        <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Enable SMS Reminders</p>
+              <p className="text-xs text-muted-foreground">Send automatic reminders ~1 hour before appointments</p>
+            </div>
+            <Switch checked={smsEnabled} onCheckedChange={setSmsEnabled} />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Apifon Sender ID</label>
+            <Input value={apifonSenderId} onChange={(e) => setApifonSenderId(e.target.value)} className="rounded-xl max-w-sm" placeholder="SALON" />
+            <p className="text-xs text-muted-foreground">The name recipients see when they receive the SMS (max 11 chars)</p>
+          </div>
         </div>
       </div>
 
