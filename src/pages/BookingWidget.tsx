@@ -65,19 +65,31 @@ export default function BookingWidget() {
     });
   }, []);
 
+  // Normalize phone: strip spaces/dashes, handle Greek prefix
+  const normalizePhone = (raw: string) => {
+    let p = raw.replace(/[\s\-()]/g, "");
+    if (p.startsWith("+30")) p = p.slice(3);
+    else if (p.startsWith("0030")) p = p.slice(4);
+    else if (p.startsWith("30") && p.length === 12) p = p.slice(2);
+    return p;
+  };
+
   // Phone lookup with debounce
   useEffect(() => {
-    if (clientInfo.phone_mobile.length < 5) {
+    const normalized = normalizePhone(clientInfo.phone_mobile);
+    if (normalized.length < 5) {
       setPhoneLookupDone(false);
       setClientFound(false);
       return;
     }
     const timer = setTimeout(async () => {
       setLookingUpPhone(true);
+      // Try exact match first, then normalized
       const { data } = await supabase
         .from("clients")
         .select("id, first_name, last_name, email, phone_mobile")
-        .eq("phone_mobile", clientInfo.phone_mobile)
+        .or(`phone_mobile.eq.${clientInfo.phone_mobile},phone_mobile.eq.${normalized}`)
+        .limit(1)
         .maybeSingle();
       if (data) {
         setClientInfo((prev) => ({
@@ -208,21 +220,31 @@ export default function BookingWidget() {
     }
 
     let clientId: string;
-    const { data: existing } = await supabase.from("clients").select("id").eq("phone_mobile", clientInfo.phone_mobile).limit(1).single();
+    const normalizedPhone = normalizePhone(clientInfo.phone_mobile);
+    const { data: existing } = await supabase
+      .from("clients")
+      .select("id")
+      .or(`phone_mobile.eq.${clientInfo.phone_mobile},phone_mobile.eq.${normalizedPhone}`)
+      .limit(1)
+      .maybeSingle();
 
     if (existing) {
       clientId = existing.id;
-      // Update email if changed
-      await supabase.from("clients").update({ email: clientInfo.email }).eq("id", clientId);
+      // Update name and email
+      await supabase.from("clients").update({
+        first_name: clientInfo.first_name,
+        last_name: clientInfo.last_name || "",
+        email: clientInfo.email,
+      }).eq("id", clientId);
     } else {
       const { data: newClient, error } = await supabase.from("clients").insert({
         first_name: clientInfo.first_name,
-        last_name: clientInfo.last_name,
-        phone_mobile: clientInfo.phone_mobile,
+        last_name: clientInfo.last_name || "",
+        phone_mobile: normalizedPhone || clientInfo.phone_mobile,
         email: clientInfo.email,
       }).select("id").single();
       if (error || !newClient) {
-        toast.error("Could not create client");
+        toast.error("Could not create client: " + (error?.message || "Unknown error"));
         setSubmitting(false);
         return;
       }
