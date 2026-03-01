@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Scissors, ChevronRight, Calendar, Clock, Check, Loader2, User, Users } from "lucide-react";
+import { Scissors, ChevronRight, Calendar, Clock, Check, Loader2, User, Users, Phone, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -18,11 +18,19 @@ const generateTimeSlots = () => {
 };
 const TIME_SLOTS = generateTimeSlots();
 
-const DATES = Array.from({ length: 7 }, (_, i) => {
-  const d = new Date();
-  d.setDate(d.getDate() + i + 1);
-  return d;
-});
+const MAX_BOOKING_DAYS = 30;
+
+const generateDates = () => {
+  const dates: Date[] = [];
+  const today = new Date();
+  for (let i = 1; i <= MAX_BOOKING_DAYS; i++) {
+    const d = new Date();
+    d.setDate(today.getDate() + i);
+    dates.push(d);
+  }
+  return dates;
+};
+const DATES = generateDates();
 
 type Step = "service" | "barber" | "date" | "time" | "info" | "confirm";
 
@@ -37,11 +45,14 @@ export default function BookingWidget() {
   const [selectedStaff, setSelectedStaff] = useState<any | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
-  const [clientInfo, setClientInfo] = useState({ first_name: "", last_name: "", phone_mobile: "" });
+  const [clientInfo, setClientInfo] = useState({ first_name: "", last_name: "", phone_mobile: "", email: "" });
   const [submitting, setSubmitting] = useState(false);
   const [bookedSlots, setBookedSlots] = useState<{ start: Date; end: Date; staffId: string }[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [assignedStaffId, setAssignedStaffId] = useState<string | null>(null);
+  const [phoneLookupDone, setPhoneLookupDone] = useState(false);
+  const [lookingUpPhone, setLookingUpPhone] = useState(false);
+  const [clientFound, setClientFound] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -54,6 +65,37 @@ export default function BookingWidget() {
     });
   }, []);
 
+  // Phone lookup with debounce
+  useEffect(() => {
+    if (clientInfo.phone_mobile.length < 5) {
+      setPhoneLookupDone(false);
+      setClientFound(false);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setLookingUpPhone(true);
+      const { data } = await supabase
+        .from("clients")
+        .select("id, first_name, last_name, email, phone_mobile")
+        .eq("phone_mobile", clientInfo.phone_mobile)
+        .maybeSingle();
+      if (data) {
+        setClientInfo((prev) => ({
+          ...prev,
+          first_name: data.first_name || prev.first_name,
+          last_name: data.last_name || prev.last_name,
+          email: data.email || prev.email,
+        }));
+        setClientFound(true);
+      } else {
+        setClientFound(false);
+      }
+      setPhoneLookupDone(true);
+      setLookingUpPhone(false);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [clientInfo.phone_mobile]);
+
   // Fetch booked slots when date is picked
   useEffect(() => {
     if (!selectedDate || !selectedStaff) return;
@@ -65,7 +107,6 @@ export default function BookingWidget() {
       dayEnd.setHours(23, 59, 59, 999);
 
       if (selectedStaff.id === "anyone") {
-        // Fetch all staff appointments for this day
         const { data } = await supabase
           .from("appointments")
           .select("start_time, end_time, staff_id")
@@ -92,7 +133,6 @@ export default function BookingWidget() {
     const slotEnd = new Date(slotStart.getTime() + selectedService.duration * 60000);
 
     if (selectedStaff?.id === "anyone") {
-      // Available if ANY staff member is free
       return staffList.some((staff) => {
         const staffSlots = bookedSlots.filter((b) => b.staffId === staff.id);
         return !staffSlots.some((b) => slotStart < b.end && slotEnd > b.start);
@@ -102,7 +142,6 @@ export default function BookingWidget() {
     return !bookedSlots.some((b) => slotStart < b.end && slotEnd > b.start);
   };
 
-  // Find the first available staff for "anyone" at a given time
   const findAvailableStaff = (time: string): any | null => {
     if (!selectedDate || !selectedService) return null;
     const slotStart = new Date(`${selectedDate.toISOString().split("T")[0]}T${time}:00`);
@@ -131,9 +170,20 @@ export default function BookingWidget() {
   };
 
   const handleConfirm = async () => {
-    if (!selectedService || !selectedDate || !selectedTime || !clientInfo.first_name || !clientInfo.phone_mobile) return;
+    if (!selectedService || !selectedDate || !selectedTime || !clientInfo.first_name || !clientInfo.phone_mobile || !clientInfo.email) return;
     const staffIdToUse = assignedStaffId;
     setSubmitting(true);
+
+    // Validate 30-day window
+    const now = new Date();
+    const maxDate = new Date();
+    maxDate.setDate(now.getDate() + MAX_BOOKING_DAYS);
+    maxDate.setHours(23, 59, 59, 999);
+    if (selectedDate > maxDate) {
+      toast.error("You can only book up to 30 days in advance.");
+      setSubmitting(false);
+      return;
+    }
 
     const startDt = new Date(`${selectedDate.toISOString().split("T")[0]}T${selectedTime}:00`);
     const endDt = new Date(startDt.getTime() + selectedService.duration * 60000);
@@ -162,11 +212,14 @@ export default function BookingWidget() {
 
     if (existing) {
       clientId = existing.id;
+      // Update email if changed
+      await supabase.from("clients").update({ email: clientInfo.email }).eq("id", clientId);
     } else {
       const { data: newClient, error } = await supabase.from("clients").insert({
         first_name: clientInfo.first_name,
         last_name: clientInfo.last_name,
         phone_mobile: clientInfo.phone_mobile,
+        email: clientInfo.email,
       }).select("id").single();
       if (error || !newClient) {
         toast.error("Could not create client");
@@ -246,7 +299,6 @@ export default function BookingWidget() {
               <motion.div key="barber" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="p-6 space-y-4">
                 <h2 className="text-lg font-semibold flex items-center gap-2"><User className="h-5 w-5" strokeWidth={1.5} />Choose a Professional</h2>
 
-                {/* Anyone / No Preference card */}
                 <button
                   onClick={() => { setSelectedStaff(ANYONE_STAFF); setStep("date"); }}
                   className="flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all border-2 border-primary/20 bg-primary/5 hover:border-primary/50"
@@ -281,12 +333,14 @@ export default function BookingWidget() {
             {step === "date" && (
               <motion.div key="date" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="p-6 space-y-4">
                 <h2 className="text-lg font-semibold flex items-center gap-2"><Calendar className="h-5 w-5" strokeWidth={1.5} />Pick a date</h2>
-                <div className="grid grid-cols-4 gap-2">
+                <p className="text-xs text-muted-foreground">You can book up to {MAX_BOOKING_DAYS} days in advance.</p>
+                <div className="grid grid-cols-4 gap-2 max-h-[300px] overflow-y-auto">
                   {DATES.map((date) => (
                     <button key={date.toISOString()} onClick={() => { setSelectedDate(date); setStep("time"); }}
                       className="rounded-xl p-3 text-center transition-all border border-border hover:border-primary/30">
                       <p className="text-xs uppercase">{date.toLocaleDateString("en", { weekday: "short" })}</p>
                       <p className="text-lg font-semibold">{date.getDate()}</p>
+                      <p className="text-[10px] text-muted-foreground">{date.toLocaleDateString("en", { month: "short" })}</p>
                     </button>
                   ))}
                 </div>
@@ -323,6 +377,25 @@ export default function BookingWidget() {
             {step === "info" && (
               <motion.div key="info" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="p-6 space-y-4">
                 <h2 className="text-lg font-semibold">Your details</h2>
+
+                {/* Phone first */}
+                <div className="space-y-1">
+                  <label className="text-sm font-medium flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />Phone *</label>
+                  <Input
+                    value={clientInfo.phone_mobile}
+                    onChange={(e) => setClientInfo({ ...clientInfo, phone_mobile: e.target.value })}
+                    className="rounded-xl"
+                    placeholder="Enter your phone number..."
+                  />
+                  {lookingUpPhone && <p className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Looking up...</p>}
+                  {phoneLookupDone && clientFound && (
+                    <p className="text-xs text-primary flex items-center gap-1"><Check className="h-3 w-3" /> Welcome back! Your details have been filled in.</p>
+                  )}
+                  {phoneLookupDone && !clientFound && clientInfo.phone_mobile.length >= 5 && (
+                    <p className="text-xs text-muted-foreground">New customer — please fill in your details below.</p>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-sm font-medium">First Name *</label>
@@ -333,13 +406,21 @@ export default function BookingWidget() {
                     <Input value={clientInfo.last_name} onChange={(e) => setClientInfo({ ...clientInfo, last_name: e.target.value })} className="rounded-xl" />
                   </div>
                 </div>
+
                 <div className="space-y-1">
-                  <label className="text-sm font-medium">Phone *</label>
-                  <Input value={clientInfo.phone_mobile} onChange={(e) => setClientInfo({ ...clientInfo, phone_mobile: e.target.value })} className="rounded-xl" />
+                  <label className="text-sm font-medium flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" />Email *</label>
+                  <Input
+                    type="email"
+                    value={clientInfo.email}
+                    onChange={(e) => setClientInfo({ ...clientInfo, email: e.target.value })}
+                    className="rounded-xl"
+                    placeholder="your@email.com"
+                  />
                 </div>
+
                 <div className="flex gap-3">
                   <Button variant="outline" className="rounded-xl" onClick={() => setStep("time")}>Back</Button>
-                  <Button className="rounded-xl flex-1" onClick={handleConfirm} disabled={submitting || !clientInfo.first_name || !clientInfo.phone_mobile}>
+                  <Button className="rounded-xl flex-1" onClick={handleConfirm} disabled={submitting || !clientInfo.first_name || !clientInfo.phone_mobile || !clientInfo.email}>
                     {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Booking"}
                   </Button>
                 </div>
@@ -358,7 +439,7 @@ export default function BookingWidget() {
                   <p><span className="text-muted-foreground">Date:</span> <span className="font-medium">{selectedDate?.toLocaleDateString("en", { weekday: "long", month: "long", day: "numeric" })}</span></p>
                   <p><span className="text-muted-foreground">Time:</span> <span className="font-medium">{selectedTime}</span></p>
                 </div>
-                <Button className="rounded-xl px-8" onClick={() => { setStep("service"); setSelectedService(null); setSelectedStaff(null); setSelectedDate(null); setSelectedTime(null); setAssignedStaffId(null); }}>
+                <Button className="rounded-xl px-8" onClick={() => { setStep("service"); setSelectedService(null); setSelectedStaff(null); setSelectedDate(null); setSelectedTime(null); setAssignedStaffId(null); setClientInfo({ first_name: "", last_name: "", phone_mobile: "", email: "" }); setPhoneLookupDone(false); setClientFound(false); }}>
                   Book Another
                 </Button>
               </motion.div>
