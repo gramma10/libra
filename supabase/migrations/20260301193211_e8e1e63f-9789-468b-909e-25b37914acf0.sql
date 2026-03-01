@@ -1,0 +1,1 @@
+CREATE POLICY "Public read staff" ON public.staff FOR SELECT USING (true);
