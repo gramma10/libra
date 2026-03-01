@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Loader2, Trash2, Bell, BellOff } from "lucide-react";
+import { Loader2, Trash2, Bell, BellOff, Phone, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -80,7 +80,12 @@ export default function EditBookingDialog({ open, onOpenChange, appointment, ser
 
   if (!appointment) return null;
 
-  const clientName = `${appointment.clients?.first_name || ""} ${appointment.clients?.last_name || ""}`.trim();
+  const client = appointment.clients;
+  const clientName = `${client?.first_name || ""} ${client?.last_name || ""}`.trim();
+  const clientPhone = client?.phone_mobile || "";
+  const clientEmail = client?.email || "";
+  const clientNotes = client?.personal_preferences || "";
+  const clientTechNotes = client?.tech_notes || "";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -89,18 +94,35 @@ export default function EditBookingDialog({ open, onOpenChange, appointment, ser
           <DialogTitle>Edit Appointment</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          {/* Client info (read-only) */}
-          <div className="rounded-xl bg-muted p-3">
+          {/* Client info (read-only, enhanced) */}
+          <div className="rounded-xl bg-muted p-4 space-y-2">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium">{clientName || "Unknown Client"}</p>
-                <p className="text-xs text-muted-foreground">Client</p>
+                <p className="text-sm font-semibold">{clientName || "Unknown Client"}</p>
               </div>
               <div className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${appointment.reminder_sent ? 'bg-primary/10 text-primary' : 'bg-muted-foreground/10 text-muted-foreground'}`}>
                 {appointment.reminder_sent ? <Bell className="h-3 w-3" /> : <BellOff className="h-3 w-3" />}
                 {appointment.reminder_sent ? 'Reminder Sent' : 'No Reminder'}
               </div>
             </div>
+            {clientPhone && (
+              <div className="flex items-center gap-2 text-xs">
+                <Phone className="h-3 w-3 text-muted-foreground" />
+                <a href={`tel:${clientPhone}`} className="text-primary hover:underline">{clientPhone}</a>
+              </div>
+            )}
+            {clientEmail && (
+              <div className="flex items-center gap-2 text-xs">
+                <Mail className="h-3 w-3 text-muted-foreground" />
+                <a href={`mailto:${clientEmail}`} className="text-primary hover:underline">{clientEmail}</a>
+              </div>
+            )}
+            {(clientNotes || clientTechNotes) && (
+              <div className="border-t border-border/50 pt-2 mt-2 space-y-1">
+                {clientNotes && <p className="text-xs text-muted-foreground"><span className="font-medium">Preferences:</span> {clientNotes}</p>}
+                {clientTechNotes && <p className="text-xs text-muted-foreground"><span className="font-medium">Tech Notes:</span> {clientTechNotes}</p>}
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
