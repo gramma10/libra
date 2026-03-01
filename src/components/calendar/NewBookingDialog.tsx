@@ -41,12 +41,27 @@ export default function NewBookingDialog({ open, onOpenChange, currentDate, pref
     setServiceId("");
   }, [open, prefillStaffId, prefillTime]);
 
+  // Normalize phone: strip spaces/dashes, handle Greek prefix
+  const normalizePhone = (raw: string) => {
+    let p = raw.replace(/[\s\-()]/g, "");
+    if (p.startsWith("+30")) p = p.slice(3);
+    else if (p.startsWith("0030")) p = p.slice(4);
+    else if (p.startsWith("30") && p.length === 12) p = p.slice(2);
+    return p;
+  };
+
   // Search client by phone with debounce
   useEffect(() => {
-    if (phone.length < 3) { setClientMatch(null); setIsNewClient(false); return; }
+    const normalized = normalizePhone(phone);
+    if (normalized.length < 3) { setClientMatch(null); setIsNewClient(false); return; }
     const timer = setTimeout(async () => {
       setSearching(true);
-      const { data } = await supabase.from("clients").select("id, first_name, last_name, phone_mobile").eq("phone_mobile", phone).maybeSingle();
+      const { data } = await supabase
+        .from("clients")
+        .select("id, first_name, last_name, phone_mobile, email")
+        .or(`phone_mobile.eq.${phone},phone_mobile.eq.${normalized}`)
+        .limit(1)
+        .maybeSingle();
       if (data) {
         setClientMatch(data);
         setIsNewClient(false);
@@ -55,7 +70,7 @@ export default function NewBookingDialog({ open, onOpenChange, currentDate, pref
         setIsNewClient(true);
       }
       setSearching(false);
-    }, 400);
+    }, 500);
     return () => clearTimeout(timer);
   }, [phone]);
 
