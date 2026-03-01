@@ -1,0 +1,1 @@
+CREATE POLICY "Public read appointments" ON public.appointments FOR SELECT USING (true);
