@@ -7,34 +7,23 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-const generateTimeSlots = () => {
-  const slots: string[] = [];
-  for (let h = 9; h < 20; h++) {
-    for (let m = 0; m < 60; m += 15) {
-      slots.push(`${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`);
-    }
-  }
-  return slots;
+interface DayHours {
+  day: string;
+  open: string;
+  close: string;
+  isClosed: boolean;
+}
+
+const DAY_MAP: Record<number, string> = {
+  0: "Sunday", 1: "Monday", 2: "Tuesday", 3: "Wednesday",
+  4: "Thursday", 5: "Friday", 6: "Saturday",
 };
-const TIME_SLOTS = generateTimeSlots();
 
 const MAX_BOOKING_DAYS = 30;
 
-const generateDates = () => {
-  const dates: Date[] = [];
-  const today = new Date();
-  for (let i = 1; i <= MAX_BOOKING_DAYS; i++) {
-    const d = new Date();
-    d.setDate(today.getDate() + i);
-    dates.push(d);
-  }
-  return dates;
-};
-const DATES = generateDates();
+const ANYONE_STAFF = { id: "anyone", first_name: "Anyone", last_name: "", role: "No Preference" };
 
 type Step = "service" | "barber" | "date" | "time" | "info" | "confirm";
-
-const ANYONE_STAFF = { id: "anyone", first_name: "Anyone", last_name: "", role: "No Preference" };
 
 export default function BookingWidget() {
   const [step, setStep] = useState<Step>("service");
@@ -53,19 +42,69 @@ export default function BookingWidget() {
   const [phoneLookupDone, setPhoneLookupDone] = useState(false);
   const [lookingUpPhone, setLookingUpPhone] = useState(false);
   const [clientFound, setClientFound] = useState(false);
+  const [logoUrl, setLogoUrl] = useState("");
+  const [shopName, setShopName] = useState("");
+  const [operatingHours, setOperatingHours] = useState<DayHours[]>([]);
+
+  // Generate time slots from operating hours for a given date
+  const getTimeSlotsForDate = (date: Date): string[] => {
+    const dayName = DAY_MAP[date.getDay()];
+    const dayHours = operatingHours.find((h) => h.day === dayName);
+    if (!dayHours || dayHours.isClosed) return [];
+
+    const slots: string[] = [];
+    const [openH, openM] = dayHours.open.split(":").map(Number);
+    const [closeH, closeM] = dayHours.close.split(":").map(Number);
+    const startMin = openH * 60 + openM;
+    const endMin = closeH * 60 + closeM;
+
+    for (let m = startMin; m < endMin; m += 15) {
+      const h = Math.floor(m / 60);
+      const min = m % 60;
+      slots.push(`${h.toString().padStart(2, "0")}:${min.toString().padStart(2, "0")}`);
+    }
+    return slots;
+  };
+
+  // Check if a date is a closed day
+  const isDayClosed = (date: Date): boolean => {
+    if (operatingHours.length === 0) return false;
+    const dayName = DAY_MAP[date.getDay()];
+    const dayHours = operatingHours.find((h) => h.day === dayName);
+    return !dayHours || dayHours.isClosed;
+  };
+
+  // Generate available dates (skip closed days)
+  const availableDates = (() => {
+    const dates: Date[] = [];
+    const today = new Date();
+    for (let i = 1; i <= MAX_BOOKING_DAYS; i++) {
+      const d = new Date();
+      d.setDate(today.getDate() + i);
+      if (!isDayClosed(d)) dates.push(d);
+    }
+    return dates;
+  })();
 
   useEffect(() => {
     Promise.all([
       supabase.from("services").select("*").order("service_name"),
       supabase.from("staff").select("*").eq("is_active", true).order("first_name"),
-    ]).then(([svcRes, staffRes]) => {
+      supabase.from("business_settings").select("logo_url, shop_name, operating_hours").limit(1).single(),
+    ]).then(([svcRes, staffRes, settingsRes]) => {
       setServices(svcRes.data || []);
       setStaffList(staffRes.data || []);
+      if (settingsRes.data) {
+        setLogoUrl(settingsRes.data.logo_url || "");
+        setShopName(settingsRes.data.shop_name || "");
+        if (settingsRes.data.operating_hours) {
+          setOperatingHours(settingsRes.data.operating_hours as unknown as DayHours[]);
+        }
+      }
       setLoading(false);
     });
   }, []);
 
-  // Normalize phone: strip spaces/dashes, handle Greek prefix
   const normalizePhone = (raw: string) => {
     let p = raw.replace(/[\s\-()]/g, "");
     if (p.startsWith("+30")) p = p.slice(3);
@@ -74,17 +113,11 @@ export default function BookingWidget() {
     return p;
   };
 
-  // Phone lookup with debounce
   useEffect(() => {
     const normalized = normalizePhone(clientInfo.phone_mobile);
-    if (normalized.length < 5) {
-      setPhoneLookupDone(false);
-      setClientFound(false);
-      return;
-    }
+    if (normalized.length < 5) { setPhoneLookupDone(false); setClientFound(false); return; }
     const timer = setTimeout(async () => {
       setLookingUpPhone(true);
-      // Try exact match first, then normalized
       const { data } = await supabase
         .from("clients")
         .select("id, first_name, last_name, email, phone_mobile")
@@ -108,7 +141,6 @@ export default function BookingWidget() {
     return () => clearTimeout(timer);
   }, [clientInfo.phone_mobile]);
 
-  // Fetch booked slots when date is picked
   useEffect(() => {
     if (!selectedDate || !selectedStaff) return;
     const fetchSlots = async () => {
@@ -118,22 +150,16 @@ export default function BookingWidget() {
       const dayEnd = new Date(selectedDate);
       dayEnd.setHours(23, 59, 59, 999);
 
-      if (selectedStaff.id === "anyone") {
-        const { data } = await supabase
-          .from("appointments")
-          .select("start_time, end_time, staff_id")
-          .gte("start_time", dayStart.toISOString())
-          .lte("start_time", dayEnd.toISOString());
-        setBookedSlots((data || []).map((a: any) => ({ start: new Date(a.start_time), end: new Date(a.end_time), staffId: a.staff_id })));
-      } else {
-        const { data } = await supabase
-          .from("appointments")
-          .select("start_time, end_time, staff_id")
-          .eq("staff_id", selectedStaff.id)
-          .gte("start_time", dayStart.toISOString())
-          .lte("start_time", dayEnd.toISOString());
-        setBookedSlots((data || []).map((a: any) => ({ start: new Date(a.start_time), end: new Date(a.end_time), staffId: a.staff_id })));
+      let query = supabase.from("appointments").select("start_time, end_time, staff_id")
+        .gte("start_time", dayStart.toISOString())
+        .lte("start_time", dayEnd.toISOString());
+
+      if (selectedStaff.id !== "anyone") {
+        query = query.eq("staff_id", selectedStaff.id);
       }
+
+      const { data } = await query;
+      setBookedSlots((data || []).map((a: any) => ({ start: new Date(a.start_time), end: new Date(a.end_time), staffId: a.staff_id })));
       setLoadingSlots(false);
     };
     fetchSlots();
@@ -150,7 +176,6 @@ export default function BookingWidget() {
         return !staffSlots.some((b) => slotStart < b.end && slotEnd > b.start);
       });
     }
-
     return !bookedSlots.some((b) => slotStart < b.end && slotEnd > b.start);
   };
 
@@ -160,9 +185,7 @@ export default function BookingWidget() {
     const slotEnd = new Date(slotStart.getTime() + selectedService.duration * 60000);
     for (const staff of staffList) {
       const staffSlots = bookedSlots.filter((b) => b.staffId === staff.id);
-      if (!staffSlots.some((b) => slotStart < b.end && slotEnd > b.start)) {
-        return staff;
-      }
+      if (!staffSlots.some((b) => slotStart < b.end && slotEnd > b.start)) return staff;
     }
     return null;
   };
@@ -186,7 +209,6 @@ export default function BookingWidget() {
     const staffIdToUse = assignedStaffId;
     setSubmitting(true);
 
-    // Validate 30-day window
     const now = new Date();
     const maxDate = new Date();
     maxDate.setDate(now.getDate() + MAX_BOOKING_DAYS);
@@ -200,7 +222,6 @@ export default function BookingWidget() {
     const startDt = new Date(`${selectedDate.toISOString().split("T")[0]}T${selectedTime}:00`);
     const endDt = new Date(startDt.getTime() + selectedService.duration * 60000);
 
-    // Final overlap check
     if (staffIdToUse) {
       const { data: overlapping } = await supabase
         .from("appointments")
@@ -209,12 +230,10 @@ export default function BookingWidget() {
         .lt("start_time", endDt.toISOString())
         .gt("end_time", startDt.toISOString())
         .limit(1);
-
       if (overlapping && overlapping.length > 0) {
         toast.error("This slot was just booked. Please choose another time.");
         setSubmitting(false);
         setStep("time");
-        setSelectedDate(new Date(selectedDate));
         return;
       }
     }
@@ -230,7 +249,6 @@ export default function BookingWidget() {
 
     if (existing) {
       clientId = existing.id;
-      // Update name and email
       await supabase.from("clients").update({
         first_name: clientInfo.first_name,
         last_name: clientInfo.last_name || "",
@@ -275,18 +293,31 @@ export default function BookingWidget() {
     return `${selectedStaff?.first_name} ${selectedStaff?.last_name}`;
   };
 
+  const resetBooking = () => {
+    setStep("service"); setSelectedService(null); setSelectedStaff(null);
+    setSelectedDate(null); setSelectedTime(null); setAssignedStaffId(null);
+    setClientInfo({ first_name: "", last_name: "", phone_mobile: "", email: "" });
+    setPhoneLookupDone(false); setClientFound(false);
+  };
+
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
   }
+
+  const timeSlots = selectedDate ? getTimeSlotsForDate(selectedDate) : [];
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5 }} className="w-full max-w-lg">
         <div className="text-center mb-8">
-          <div className="h-14 w-14 mx-auto rounded-2xl bg-primary flex items-center justify-center mb-4">
-            <Scissors className="h-6 w-6 text-primary-foreground" strokeWidth={1.5} />
-          </div>
-          <h1 className="text-2xl font-semibold tracking-tight">Book an Appointment</h1>
+          {logoUrl ? (
+            <img src={logoUrl} alt="Logo" className="h-14 w-14 mx-auto rounded-2xl object-cover mb-4" />
+          ) : (
+            <div className="h-14 w-14 mx-auto rounded-2xl bg-primary flex items-center justify-center mb-4">
+              <Scissors className="h-6 w-6 text-primary-foreground" strokeWidth={1.5} />
+            </div>
+          )}
+          <h1 className="text-2xl font-semibold tracking-tight">{shopName || "Book an Appointment"}</h1>
         </div>
 
         <div className="flex items-center justify-center gap-2 mb-8">
@@ -320,11 +351,8 @@ export default function BookingWidget() {
             {step === "barber" && (
               <motion.div key="barber" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="p-6 space-y-4">
                 <h2 className="text-lg font-semibold flex items-center gap-2"><User className="h-5 w-5" strokeWidth={1.5} />Choose a Professional</h2>
-
-                <button
-                  onClick={() => { setSelectedStaff(ANYONE_STAFF); setStep("date"); }}
-                  className="flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all border-2 border-primary/20 bg-primary/5 hover:border-primary/50"
-                >
+                <button onClick={() => { setSelectedStaff(ANYONE_STAFF); setStep("date"); }}
+                  className="flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all border-2 border-primary/20 bg-primary/5 hover:border-primary/50">
                   <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                     <Users className="h-5 w-5 text-primary" strokeWidth={1.5} />
                   </div>
@@ -334,8 +362,6 @@ export default function BookingWidget() {
                   </div>
                   <ChevronRight className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
                 </button>
-
-                {staffList.length === 0 && <p className="text-sm text-muted-foreground">No barbers available.</p>}
                 <div className="grid grid-cols-2 gap-3">
                   {staffList.map((s: any) => (
                     <button key={s.id} onClick={() => { setSelectedStaff(s); setStep("date"); }}
@@ -356,16 +382,20 @@ export default function BookingWidget() {
               <motion.div key="date" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="p-6 space-y-4">
                 <h2 className="text-lg font-semibold flex items-center gap-2"><Calendar className="h-5 w-5" strokeWidth={1.5} />Pick a date</h2>
                 <p className="text-xs text-muted-foreground">You can book up to {MAX_BOOKING_DAYS} days in advance.</p>
-                <div className="grid grid-cols-4 gap-2 max-h-[300px] overflow-y-auto">
-                  {DATES.map((date) => (
-                    <button key={date.toISOString()} onClick={() => { setSelectedDate(date); setStep("time"); }}
-                      className="rounded-xl p-3 text-center transition-all border border-border hover:border-primary/30">
-                      <p className="text-xs uppercase">{date.toLocaleDateString("en", { weekday: "short" })}</p>
-                      <p className="text-lg font-semibold">{date.getDate()}</p>
-                      <p className="text-[10px] text-muted-foreground">{date.toLocaleDateString("en", { month: "short" })}</p>
-                    </button>
-                  ))}
-                </div>
+                {availableDates.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center">No available dates in the next {MAX_BOOKING_DAYS} days.</p>
+                ) : (
+                  <div className="grid grid-cols-4 gap-2 max-h-[300px] overflow-y-auto">
+                    {availableDates.map((date) => (
+                      <button key={date.toISOString()} onClick={() => { setSelectedDate(date); setStep("time"); }}
+                        className="rounded-xl p-3 text-center transition-all border border-border hover:border-primary/30">
+                        <p className="text-xs uppercase">{date.toLocaleDateString("en", { weekday: "short" })}</p>
+                        <p className="text-lg font-semibold">{date.getDate()}</p>
+                        <p className="text-[10px] text-muted-foreground">{date.toLocaleDateString("en", { month: "short" })}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <Button variant="outline" className="rounded-xl" onClick={() => setStep("barber")}>Back</Button>
               </motion.div>
             )}
@@ -375,9 +405,11 @@ export default function BookingWidget() {
                 <h2 className="text-lg font-semibold flex items-center gap-2"><Clock className="h-5 w-5" strokeWidth={1.5} />Pick a time</h2>
                 {loadingSlots ? (
                   <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+                ) : timeSlots.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center">No time slots available for this day.</p>
                 ) : (
                   <div className="grid grid-cols-4 gap-2">
-                    {TIME_SLOTS.map((time) => {
+                    {timeSlots.map((time) => {
                       const available = isSlotAvailable(time);
                       return (
                         <button key={time} onClick={() => { if (available) handleTimeSelect(time); }}
@@ -399,25 +431,13 @@ export default function BookingWidget() {
             {step === "info" && (
               <motion.div key="info" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="p-6 space-y-4">
                 <h2 className="text-lg font-semibold">Your details</h2>
-
-                {/* Phone first */}
                 <div className="space-y-1">
                   <label className="text-sm font-medium flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />Phone *</label>
-                  <Input
-                    value={clientInfo.phone_mobile}
-                    onChange={(e) => setClientInfo({ ...clientInfo, phone_mobile: e.target.value })}
-                    className="rounded-xl"
-                    placeholder="Enter your phone number..."
-                  />
+                  <Input value={clientInfo.phone_mobile} onChange={(e) => setClientInfo({ ...clientInfo, phone_mobile: e.target.value })} className="rounded-xl" placeholder="Enter your phone number..." />
                   {lookingUpPhone && <p className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Looking up...</p>}
-                  {phoneLookupDone && clientFound && (
-                    <p className="text-xs text-primary flex items-center gap-1"><Check className="h-3 w-3" /> Welcome back! Your details have been filled in.</p>
-                  )}
-                  {phoneLookupDone && !clientFound && clientInfo.phone_mobile.length >= 5 && (
-                    <p className="text-xs text-muted-foreground">New customer — please fill in your details below.</p>
-                  )}
+                  {phoneLookupDone && clientFound && <p className="text-xs text-primary flex items-center gap-1"><Check className="h-3 w-3" /> Welcome back! Your details have been filled in.</p>}
+                  {phoneLookupDone && !clientFound && clientInfo.phone_mobile.length >= 5 && <p className="text-xs text-muted-foreground">New customer — please fill in your details below.</p>}
                 </div>
-
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-sm font-medium">First Name *</label>
@@ -428,18 +448,10 @@ export default function BookingWidget() {
                     <Input value={clientInfo.last_name} onChange={(e) => setClientInfo({ ...clientInfo, last_name: e.target.value })} className="rounded-xl" />
                   </div>
                 </div>
-
                 <div className="space-y-1">
                   <label className="text-sm font-medium flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" />Email *</label>
-                  <Input
-                    type="email"
-                    value={clientInfo.email}
-                    onChange={(e) => setClientInfo({ ...clientInfo, email: e.target.value })}
-                    className="rounded-xl"
-                    placeholder="your@email.com"
-                  />
+                  <Input type="email" value={clientInfo.email} onChange={(e) => setClientInfo({ ...clientInfo, email: e.target.value })} className="rounded-xl" placeholder="your@email.com" />
                 </div>
-
                 <div className="flex gap-3">
                   <Button variant="outline" className="rounded-xl" onClick={() => setStep("time")}>Back</Button>
                   <Button className="rounded-xl flex-1" onClick={handleConfirm} disabled={submitting || !clientInfo.first_name || !clientInfo.phone_mobile || !clientInfo.email}>
@@ -461,9 +473,7 @@ export default function BookingWidget() {
                   <p><span className="text-muted-foreground">Date:</span> <span className="font-medium">{selectedDate?.toLocaleDateString("en", { weekday: "long", month: "long", day: "numeric" })}</span></p>
                   <p><span className="text-muted-foreground">Time:</span> <span className="font-medium">{selectedTime}</span></p>
                 </div>
-                <Button className="rounded-xl px-8" onClick={() => { setStep("service"); setSelectedService(null); setSelectedStaff(null); setSelectedDate(null); setSelectedTime(null); setAssignedStaffId(null); setClientInfo({ first_name: "", last_name: "", phone_mobile: "", email: "" }); setPhoneLookupDone(false); setClientFound(false); }}>
-                  Book Another
-                </Button>
+                <Button className="rounded-xl px-8" onClick={resetBooking}>Book Another</Button>
               </motion.div>
             )}
           </AnimatePresence>
