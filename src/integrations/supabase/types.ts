@@ -79,6 +79,7 @@ export type Database = {
           google_review_url: string | null
           id: string
           logo_url: string | null
+          operating_hours: Json | null
           shop_name: string
           sms_enabled: boolean
           sms_provider_api: string | null
@@ -91,6 +92,7 @@ export type Database = {
           google_review_url?: string | null
           id?: string
           logo_url?: string | null
+          operating_hours?: Json | null
           shop_name?: string
           sms_enabled?: boolean
           sms_provider_api?: string | null
@@ -103,6 +105,7 @@ export type Database = {
           google_review_url?: string | null
           id?: string
           logo_url?: string | null
+          operating_hours?: Json | null
           shop_name?: string
           sms_enabled?: boolean
           sms_provider_api?: string | null
