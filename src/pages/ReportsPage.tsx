@@ -1,22 +1,11 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
-import { DollarSign, Calendar, UserX, TrendingUp, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { DollarSign, Calendar, UserX, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Loader2, Wallet } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-
-const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-const getMonthGrid = (date: Date) => {
-  const year = date.getFullYear();
-  const month = date.getMonth();
-  const firstDay = new Date(year, month, 1);
-  const lastDay = new Date(year, month + 1, 0);
-  const startOffset = (firstDay.getDay() + 6) % 7;
-  const days: (Date | null)[] = Array.from({ length: startOffset }, () => null);
-  for (let d = 1; d <= lastDay.getDate(); d++) days.push(new Date(year, month, d));
-  while (days.length % 7 !== 0) days.push(null);
-  return days;
-};
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import ReportsCalendar from "@/components/reports/ReportsCalendar";
+import StatCard from "@/components/reports/StatCard";
 
 const formatCurrency = (v: number) => `€${v.toFixed(0)}`;
 const monthLabel = (d: Date) => d.toLocaleString("default", { month: "long", year: "numeric" });
@@ -32,11 +21,13 @@ interface Appointment {
   services?: { price: number; service_name: string } | null;
 }
 
-/** Revenue counts if: status is NOT 'Cancelled' or 'No-Show', AND end_time has passed */
+interface StaffMember {
+  id: string;
+  commission_rate: number;
+}
+
 const isRevenueEligible = (a: Appointment, now: Date) =>
-  a.status !== "Cancelled" &&
-  a.status !== "No-Show" &&
-  new Date(a.end_time) <= now;
+  a.status !== "Cancelled" && a.status !== "No-Show" && new Date(a.end_time) <= now;
 
 const sumRevenue = (appts: Appointment[], now: Date) =>
   appts.filter((a) => isRevenueEligible(a, now)).reduce((s, a) => s + Number(a.services?.price || 0), 0);
@@ -45,28 +36,46 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [viewDate, setViewDate] = useState(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [monthExpenses, setMonthExpenses] = useState(0);
+  const [staffMap, setStaffMap] = useState<Record<string, number>>({});
 
   const now = useMemo(() => new Date(), []);
 
-  const fetchAppointments = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     const year = viewDate.getFullYear();
     const month = viewDate.getMonth();
     const start = new Date(year, month, 1);
     const end = new Date(year, month + 1, 0, 23, 59, 59, 999);
+    const startDate = start.toISOString().split("T")[0];
+    const endDate = end.toISOString().split("T")[0];
 
-    const { data } = await supabase
-      .from("appointments")
-      .select("id, start_time, end_time, status, is_paid, service_id, staff_id, services(price, service_name)")
-      .gte("start_time", start.toISOString())
-      .lte("start_time", end.toISOString())
-      .order("start_time");
+    const [apptRes, expRes, staffRes] = await Promise.all([
+      supabase
+        .from("appointments")
+        .select("id, start_time, end_time, status, is_paid, service_id, staff_id, services(price, service_name)")
+        .gte("start_time", start.toISOString())
+        .lte("start_time", end.toISOString())
+        .order("start_time"),
+      supabase
+        .from("expenses")
+        .select("amount")
+        .gte("date", startDate)
+        .lte("date", endDate),
+      supabase.from("staff").select("id, commission_rate"),
+    ]);
 
-    setAppointments((data as Appointment[]) || []);
+    setAppointments((apptRes.data as Appointment[]) || []);
+    setMonthExpenses((expRes.data || []).reduce((s: number, e: any) => s + Number(e.amount), 0));
+
+    const map: Record<string, number> = {};
+    (staffRes.data as StaffMember[] || []).forEach((s) => { map[s.id] = Number(s.commission_rate); });
+    setStaffMap(map);
+
     setLoading(false);
   }, [viewDate]);
 
-  useEffect(() => { fetchAppointments(); }, [fetchAppointments]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const navigate = (dir: number) => {
     const d = new Date(viewDate);
@@ -79,7 +88,20 @@ export default function ReportsPage() {
   const monthAppts = appointments.filter((a) => a.status !== "Cancelled").length;
   const monthNoShows = appointments.filter((a) => a.status === "No-Show").length;
 
-  // Current week stats (week containing today)
+  // Automated commissions
+  const monthCommissions = useMemo(() => {
+    return appointments
+      .filter((a) => isRevenueEligible(a, now) && a.staff_id && a.services?.price)
+      .reduce((sum, a) => {
+        const rate = staffMap[a.staff_id!] || 0;
+        return sum + (Number(a.services!.price) * rate / 100);
+      }, 0);
+  }, [appointments, staffMap, now]);
+
+  const totalExpenses = monthExpenses + monthCommissions;
+  const netProfit = monthRevenue - totalExpenses;
+
+  // Week stats
   const weekStart = useMemo(() => {
     const d = new Date(now);
     d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
@@ -92,7 +114,6 @@ export default function ReportsPage() {
     d.setHours(23, 59, 59, 999);
     return d;
   }, [weekStart]);
-
   const weekAppts = appointments.filter((a) => {
     const s = new Date(a.start_time);
     return s >= weekStart && s <= weekEnd;
@@ -100,7 +121,7 @@ export default function ReportsPage() {
   const weekRevenue = sumRevenue(weekAppts, now);
   const weekApptCount = weekAppts.filter((a) => a.status !== "Cancelled").length;
 
-  // Daily revenue map
+  // Daily maps for calendar
   const dailyRevenue = useMemo(() => {
     const map: Record<string, number> = {};
     appointments.forEach((a) => {
@@ -111,7 +132,6 @@ export default function ReportsPage() {
     return map;
   }, [appointments, now]);
 
-  // Daily appointment count
   const dailyCount = useMemo(() => {
     const map: Record<string, number> = {};
     appointments.forEach((a) => {
@@ -122,15 +142,18 @@ export default function ReportsPage() {
     return map;
   }, [appointments]);
 
-  const grid = getMonthGrid(viewDate);
-  const weeks: (Date | null)[][] = [];
-  for (let i = 0; i < grid.length; i += 7) weeks.push(grid.slice(i, i + 7));
-  const todayStr = now.toDateString();
+  // Bar chart data — last 6 months placeholder using current month data
+  const chartData = useMemo(() => {
+    const d = new Date(viewDate);
+    return [
+      { name: monthLabel(d).split(" ")[0], Revenue: monthRevenue, Expenses: totalExpenses },
+    ];
+  }, [viewDate, monthRevenue, totalExpenses]);
 
   const stats = [
     { label: "Month Revenue", value: formatCurrency(monthRevenue), icon: DollarSign, color: "hsl(var(--success))" },
-    { label: "Week Revenue", value: formatCurrency(weekRevenue), icon: TrendingUp, color: "hsl(var(--primary))" },
-    { label: "Month Appointments", value: String(monthAppts), icon: Calendar, color: "hsl(210 80% 55%)" },
+    { label: "Total Expenses", value: formatCurrency(totalExpenses), icon: TrendingDown, color: "hsl(var(--destructive))", subtitle: `Manual: €${monthExpenses.toFixed(0)} · Commissions: €${monthCommissions.toFixed(0)}` },
+    { label: "Net Profit", value: formatCurrency(netProfit), icon: Wallet, color: netProfit >= 0 ? "hsl(var(--success))" : "hsl(var(--destructive))", highlight: true, positive: netProfit >= 0 },
     { label: "No-Shows", value: String(monthNoShows), icon: UserX, color: "hsl(var(--destructive))" },
   ];
 
@@ -140,34 +163,16 @@ export default function ReportsPage() {
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Analytics</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Revenue &amp; appointment insights</p>
+        <p className="text-sm text-muted-foreground mt-0.5">Revenue, expenses &amp; profit insights</p>
       </div>
 
       {/* Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, i) => {
-          const Icon = stat.icon;
-          return (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.06 }}
-              className="rounded-2xl border border-border bg-card p-5 shadow-apple"
-            >
-              <div className="flex items-center justify-between">
-                <div className="rounded-xl p-2" style={{ backgroundColor: stat.color + "15" }}>
-                  <Icon className="h-4 w-4" style={{ color: stat.color }} strokeWidth={2} />
-                </div>
-              </div>
-              <p className="text-2xl font-semibold mt-3 tracking-tight">{stat.value}</p>
-              <p className="text-xs text-muted-foreground mt-1">{stat.label}</p>
-            </motion.div>
-          );
-        })}
+        {stats.map((stat, i) => (
+          <StatCard key={stat.label} stat={stat} index={i} />
+        ))}
       </div>
 
       {/* Weekly summary bar */}
@@ -182,57 +187,30 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {/* Calendar */}
-      <div className="rounded-2xl border border-border bg-card shadow-apple overflow-hidden">
-        {/* Calendar nav */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-border">
-          <Button variant="ghost" size="icon" className="rounded-xl" onClick={() => navigate(-1)}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <h3 className="text-sm font-semibold">{monthLabel(viewDate)}</h3>
-          <Button variant="ghost" size="icon" className="rounded-xl" onClick={() => navigate(1)}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-
-        {/* Weekday headers */}
-        <div className="grid grid-cols-7 border-b border-border bg-muted/30">
-          {DAYS.map((d) => (
-            <div key={d} className="text-center py-2 text-[11px] font-medium text-muted-foreground uppercase">{d}</div>
-          ))}
-        </div>
-
-        {/* Day cells */}
-        {weeks.map((week, wi) => (
-          <div key={wi} className="grid grid-cols-7 border-b border-border/40 last:border-b-0" style={{ minHeight: 80 }}>
-            {week.map((day, di) => {
-              if (!day) return <div key={di} className="border-r border-border/30 last:border-r-0 bg-muted/10" />;
-              const dayStr = day.toDateString();
-              const isToday = dayStr === todayStr;
-              const rev = dailyRevenue[dayStr] || 0;
-              const count = dailyCount[dayStr] || 0;
-
-              return (
-                <div key={di} className="border-r border-border/30 last:border-r-0 p-2 transition-colors hover:bg-muted/20">
-                  <div className="flex items-center justify-between mb-1">
-                    <div className={`text-sm font-medium w-7 h-7 flex items-center justify-center rounded-full ${isToday ? "bg-primary text-primary-foreground" : "text-foreground"}`}>
-                      {day.getDate()}
-                    </div>
-                    {count > 0 && (
-                      <span className="text-[9px] font-medium text-muted-foreground bg-muted rounded-full px-1.5 py-0.5">{count}</span>
-                    )}
-                  </div>
-                  {rev > 0 && (
-                    <div className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "hsl(145 63% 42% / 0.12)", color: "hsl(var(--success))" }}>
-                      {formatCurrency(rev)}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ))}
+      {/* Revenue vs Expenses Chart */}
+      <div className="rounded-2xl border border-border bg-card p-5 shadow-apple">
+        <h3 className="text-sm font-semibold mb-4">Revenue vs Expenses</h3>
+        <ResponsiveContainer width="100%" height={220}>
+          <BarChart data={chartData} barGap={8}>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+            <XAxis dataKey="name" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+            <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => `€${v}`} />
+            <Tooltip formatter={(v: number) => `€${v.toFixed(0)}`} contentStyle={{ borderRadius: 12, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }} />
+            <Legend />
+            <Bar dataKey="Revenue" fill="hsl(145 63% 42%)" radius={[6, 6, 0, 0]} />
+            <Bar dataKey="Expenses" fill="hsl(0 72% 51%)" radius={[6, 6, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
       </div>
+
+      {/* Calendar */}
+      <ReportsCalendar
+        viewDate={viewDate}
+        onNavigate={navigate}
+        dailyRevenue={dailyRevenue}
+        dailyCount={dailyCount}
+        now={now}
+      />
     </motion.div>
   );
 }

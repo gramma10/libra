@@ -12,6 +12,7 @@ import {
   Scissors as ScissorsIcon,
   Sparkles,
   UserCog,
+  Receipt,
 } from "lucide-react";
 import { SidebarNavItem } from "@/components/SidebarNavItem";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,7 @@ const navItems = [
   { to: "/services", icon: Sparkles, label: "Services" },
   { to: "/staff", icon: UserCog, label: "Employees" },
   { to: "/inventory", icon: Package, label: "Inventory" },
+  { to: "/expenses", icon: Receipt, label: "Expenses" },
   { to: "/marketing", icon: Megaphone, label: "Marketing" },
   { to: "/reports", icon: BarChart3, label: "Reports" },
   { to: "/settings", icon: Settings, label: "Settings" },

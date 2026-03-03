@@ -158,6 +158,36 @@ export type Database = {
         }
         Relationships: []
       }
+      expenses: {
+        Row: {
+          amount: number
+          category: Database["public"]["Enums"]["expense_category"]
+          created_at: string
+          date: string
+          description: string | null
+          id: string
+          status: Database["public"]["Enums"]["expense_status"]
+        }
+        Insert: {
+          amount?: number
+          category?: Database["public"]["Enums"]["expense_category"]
+          created_at?: string
+          date?: string
+          description?: string | null
+          id?: string
+          status?: Database["public"]["Enums"]["expense_status"]
+        }
+        Update: {
+          amount?: number
+          category?: Database["public"]["Enums"]["expense_category"]
+          created_at?: string
+          date?: string
+          description?: string | null
+          id?: string
+          status?: Database["public"]["Enums"]["expense_status"]
+        }
+        Relationships: []
+      }
       inventory: {
         Row: {
           cost_price: number
@@ -306,6 +336,15 @@ export type Database = {
         | "Cancelled"
         | "No-Show"
         | "Completed"
+      expense_category:
+        | "Rent"
+        | "Electricity"
+        | "Water"
+        | "Products"
+        | "Salaries"
+        | "Marketing"
+        | "Other"
+      expense_status: "Paid" | "Pending"
       payment_method: "Cash" | "Card" | "Revolut" | "Stripe"
       theme_style: "Minimal" | "Industrial" | "Modern" | "Classic"
     }
@@ -442,6 +481,16 @@ export const Constants = {
         "No-Show",
         "Completed",
       ],
+      expense_category: [
+        "Rent",
+        "Electricity",
+        "Water",
+        "Products",
+        "Salaries",
+        "Marketing",
+        "Other",
+      ],
+      expense_status: ["Paid", "Pending"],
       payment_method: ["Cash", "Card", "Revolut", "Stripe"],
       theme_style: ["Minimal", "Industrial", "Modern", "Classic"],
     },
