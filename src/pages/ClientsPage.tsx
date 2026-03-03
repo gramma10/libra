@@ -5,11 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { useShop } from "@/hooks/useShop";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 
 export default function ClientsPage() {
+  const { shopId } = useShop();
   const [search, setSearch] = useState("");
   const [clients, setClients] = useState<any[]>([]);
   const [selected, setSelected] = useState<any | null>(null);
@@ -88,7 +90,7 @@ export default function ClientsPage() {
       return;
     }
     setSaving(true);
-    const { error } = await supabase.from("clients").insert(form);
+    const { error } = await supabase.from("clients").insert({ ...form, shop_id: shopId! });
     if (error) toast.error(error.message);
     else {
       toast.success("Client added");

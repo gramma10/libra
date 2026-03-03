@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useShop } from "@/hooks/useShop";
 import { toast } from "sonner";
 
 interface SellProductDialogProps {
@@ -14,6 +15,7 @@ interface SellProductDialogProps {
 }
 
 export default function SellProductDialog({ open, onOpenChange, product, onSuccess }: SellProductDialogProps) {
+  const { shopId } = useShop();
   const [quantity, setQuantity] = useState(1);
   const [saleDate, setSaleDate] = useState(new Date().toISOString().split("T")[0]);
   const [saving, setSaving] = useState(false);
@@ -28,18 +30,17 @@ export default function SellProductDialog({ open, onOpenChange, product, onSucce
 
     setSaving(true);
 
-    // 1. Create product sale record
     const { error: saleError } = await supabase.from("product_sales").insert({
       inventory_id: product.id,
       quantity,
       unit_price: Number(product.retail_price),
       total_amount: total,
       sale_date: saleDate,
+      shop_id: shopId!,
     });
 
     if (saleError) { toast.error(saleError.message); setSaving(false); return; }
 
-    // 2. Decrement stock
     const { error: stockError } = await supabase
       .from("inventory")
       .update({ current_stock: product.current_stock - quantity })

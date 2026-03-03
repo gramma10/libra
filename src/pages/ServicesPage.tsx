@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useShop } from "@/hooks/useShop";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,6 +35,7 @@ const defaultForm: Partial<TablesInsert<"services">> = {
 
 export default function ServicesPage() {
   const qc = useQueryClient();
+  const { shopId } = useShop();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Service | null>(null);
   const [form, setForm] = useState(defaultForm);
@@ -69,6 +71,7 @@ export default function ServicesPage() {
           duration: values.duration!,
           price: values.price!,
           category_color: values.category_color!,
+          shop_id: shopId!,
         });
         if (error) throw error;
       }
