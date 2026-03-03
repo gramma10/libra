@@ -221,6 +221,44 @@ export type Database = {
         }
         Relationships: []
       }
+      product_sales: {
+        Row: {
+          created_at: string
+          id: string
+          inventory_id: string
+          quantity: number
+          sale_date: string
+          total_amount: number
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          inventory_id: string
+          quantity: number
+          sale_date?: string
+          total_amount: number
+          unit_price: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          inventory_id?: string
+          quantity?: number
+          sale_date?: string
+          total_amount?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_sales_inventory_id_fkey"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "inventory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       services: {
         Row: {
           category_color: string
