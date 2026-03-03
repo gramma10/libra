@@ -30,11 +30,17 @@ export default function JoinPage() {
   const [submitting, setSubmitting] = useState(false);
   const [accepted, setAccepted] = useState(false);
 
+  // Store invite code in localStorage so it survives auth redirects
+  useEffect(() => {
+    if (code) {
+      localStorage.setItem("pending_invite_code", code);
+    }
+  }, [code]);
+
   useEffect(() => {
     if (!code) return;
     const fetchInvitation = async () => {
       setLoading(true);
-      // Fetch invitation with shop and staff details
       const { data, error: fetchError } = await supabase
         .from("invitations")
         .select("id, shop_id, staff_id, invite_code, status")
@@ -44,18 +50,17 @@ export default function JoinPage() {
 
       if (fetchError || !data) {
         setError("This invitation link is invalid or has expired.");
+        localStorage.removeItem("pending_invite_code");
         setLoading(false);
         return;
       }
 
-      // Fetch shop name separately
       const { data: shop } = await supabase
         .from("shops")
         .select("name")
         .eq("id", data.shop_id)
         .single();
 
-      // Fetch staff info separately
       const { data: staff } = await supabase
         .from("staff")
         .select("first_name, last_name, role")
@@ -104,7 +109,7 @@ export default function JoinPage() {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: window.location.origin },
+      options: { emailRedirectTo: `${window.location.origin}/join/${code}` },
     });
 
     if (error) {
