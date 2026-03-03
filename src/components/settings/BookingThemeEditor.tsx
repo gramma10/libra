@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { Palette, Loader2, Smartphone, ChevronRight, Store } from "lucide-react";
+import { Palette, Loader2, Smartphone, ChevronRight, Store, Link, Copy, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useShop } from "@/hooks/useShop";
 import { toast } from "sonner";
@@ -13,7 +13,7 @@ import { ThemeSettings, DEFAULT_THEME, THEME_PRESETS, FONT_OPTIONS } from "./The
 import LogoUploader from "./LogoUploader";
 
 export default function BookingThemeEditor() {
-  const { shopId } = useShop();
+  const { shopId, shopSlug } = useShop();
   const [theme, setTheme] = useState<ThemeSettings>(DEFAULT_THEME);
   const [shopName, setShopName] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
@@ -194,6 +194,44 @@ export default function BookingThemeEditor() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Online Booking Link */}
+        {shopSlug && (
+          <Card className="rounded-2xl shadow-apple">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2"><Link className="h-4 w-4" />Online Booking Link</CardTitle>
+              <CardDescription className="text-xs">Share this link with your clients</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-2">
+                <Input
+                  readOnly
+                  value={`${window.location.origin}/book/${shopSlug}`}
+                  className="rounded-xl text-xs font-mono bg-muted"
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="rounded-xl shrink-0"
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}/book/${shopSlug}`);
+                    toast.success("Link copied!");
+                  }}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="rounded-xl shrink-0"
+                  onClick={() => window.open(`/book/${shopSlug}`, "_blank")}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Button className="rounded-xl gap-2" onClick={handleSave} disabled={saving}>
           {saving && <Loader2 className="h-4 w-4 animate-spin" />}
