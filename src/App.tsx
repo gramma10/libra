@@ -19,7 +19,7 @@ import MyStatsPage from "@/pages/MyStatsPage";
 import BookingWidget from "@/pages/BookingWidget";
 import AuthPage from "@/pages/AuthPage";
 import OnboardingPage from "@/pages/OnboardingPage";
-import JoinPage from "@/pages/JoinPage";
+// JoinPage removed - direct account creation replaces invitations
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -37,7 +37,7 @@ const App = () => (
               <Route path="/book/:slug" element={<BookingWidget />} />
               <Route path="/book" element={<BookingWidget />} />
               <Route path="/auth" element={<AuthPage />} />
-              <Route path="/join/:code" element={<JoinPage />} />
+              {/* /join/:code removed - direct account creation replaces invitations */}
               <Route path="/onboarding" element={<OnboardingPage />} />
 
               {/* Protected Dashboard */}
