@@ -72,8 +72,7 @@ export default function StaffPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("invitations")
-        .select("*")
-        .eq("status", "pending");
+        .select("*");
       if (error) throw error;
       return data as Invitation[];
     },
@@ -120,8 +119,7 @@ export default function StaffPage() {
   });
 
   const generateInvite = async (staffMember: Staff) => {
-    // Check for existing pending invitation
-    const existing = invitations.find((i) => i.staff_id === staffMember.id);
+    const existing = invitations.find((i) => i.staff_id === staffMember.id && i.status === "pending");
     if (existing) {
       const link = `${window.location.origin}/join/${existing.invite_code}`;
       setInviteLink(link);
@@ -187,7 +185,15 @@ export default function StaffPage() {
     upsert.mutate({ ...form, id: editing?.id });
   }
 
-  const hasInvite = (staffId: string) => invitations.some((i) => i.staff_id === staffId);
+  const getInviteStatus = (staffId: string): "accepted" | "pending" | "expired" | null => {
+    const inv = invitations.find((i) => i.staff_id === staffId);
+    if (!inv) return null;
+    if (inv.status === "accepted") return "accepted";
+    if (new Date(inv.expires_at) < new Date()) return "expired";
+    return "pending";
+  };
+
+  const hasInvite = (staffId: string) => invitations.some((i) => i.staff_id === staffId && i.status === "pending");
 
   return (
     <div className="space-y-6">
@@ -225,7 +231,17 @@ export default function StaffPage() {
             ) : (
               staff.map((s) => (
                 <TableRow key={s.id}>
-                  <TableCell className="font-medium">{s.first_name} {s.last_name}</TableCell>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      {s.first_name} {s.last_name}
+                      {(() => {
+                        const status = getInviteStatus(s.id);
+                        if (!status) return null;
+                        const variant = status === "accepted" ? "default" : status === "expired" ? "destructive" : "outline";
+                        return <Badge variant={variant} className="text-[10px] px-1.5 py-0">{status}</Badge>;
+                      })()}
+                    </div>
+                  </TableCell>
                   <TableCell>{s.role}</TableCell>
                   <TableCell>{s.phone}</TableCell>
                   <TableCell>{Number(s.commission_rate)}%</TableCell>
