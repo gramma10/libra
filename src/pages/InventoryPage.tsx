@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Search, Plus, AlertTriangle, Loader2 } from "lucide-react";
+import { Search, Plus, AlertTriangle, Loader2, ShoppingBag } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import SellProductDialog from "@/components/inventory/SellProductDialog";
 
 export default function InventoryPage() {
   const [search, setSearch] = useState("");
@@ -15,6 +16,7 @@ export default function InventoryPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ product_name: "", sku: "", current_stock: 0, min_stock_level: 0, cost_price: 0, retail_price: 0 });
+  const [sellProduct, setSellProduct] = useState<any>(null);
 
   const fetchItems = async () => {
     setLoading(true);
@@ -34,14 +36,26 @@ export default function InventoryPage() {
   const handleAdd = async () => {
     if (!form.product_name) { toast.error("Product name is required"); return; }
     setSaving(true);
+
     const { error } = await supabase.from("inventory").insert(form);
-    if (error) toast.error(error.message);
-    else {
-      toast.success("Product added");
-      setShowAdd(false);
-      setForm({ product_name: "", sku: "", current_stock: 0, min_stock_level: 0, cost_price: 0, retail_price: 0 });
-      fetchItems();
+    if (error) { toast.error(error.message); setSaving(false); return; }
+
+    // Auto-create expense if initial stock > 0
+    if (form.current_stock > 0 && form.cost_price > 0) {
+      const expenseAmount = form.cost_price * form.current_stock;
+      await supabase.from("expenses").insert({
+        date: new Date().toISOString().split("T")[0],
+        category: "Products" as any,
+        amount: expenseAmount,
+        status: "Paid" as any,
+        description: `Purchase of ${form.product_name} (${form.current_stock} units)`,
+      });
     }
+
+    toast.success("Product added");
+    setShowAdd(false);
+    setForm({ product_name: "", sku: "", current_stock: 0, min_stock_level: 0, cost_price: 0, retail_price: 0 });
+    fetchItems();
     setSaving(false);
   };
 
@@ -85,11 +99,12 @@ export default function InventoryPage() {
                 <th className="text-left p-4 font-medium">Stock</th>
                 <th className="text-left p-4 font-medium">Cost</th>
                 <th className="text-left p-4 font-medium">Retail</th>
+                <th className="text-right p-4 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 && (
-                <tr><td colSpan={5} className="p-8 text-center text-sm text-muted-foreground">No products found.</td></tr>
+                <tr><td colSpan={6} className="p-8 text-center text-sm text-muted-foreground">No products found.</td></tr>
               )}
               {filtered.map((item) => {
                 const isLow = item.current_stock <= item.min_stock_level;
@@ -106,6 +121,18 @@ export default function InventoryPage() {
                     </td>
                     <td className="p-4 text-sm">€{Number(item.cost_price).toFixed(2)}</td>
                     <td className="p-4 text-sm">€{Number(item.retail_price).toFixed(2)}</td>
+                    <td className="p-4 text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="rounded-lg gap-1.5 text-xs"
+                        onClick={() => setSellProduct(item)}
+                        disabled={item.current_stock <= 0}
+                      >
+                        <ShoppingBag className="h-3.5 w-3.5" strokeWidth={1.5} />
+                        Sell
+                      </Button>
+                    </td>
                   </tr>
                 );
               })}
@@ -146,6 +173,11 @@ export default function InventoryPage() {
                 <Input type="number" step="0.01" value={form.retail_price} onChange={(e) => setForm({ ...form, retail_price: Number(e.target.value) })} className="rounded-xl" />
               </div>
             </div>
+            {form.current_stock > 0 && form.cost_price > 0 && (
+              <div className="rounded-xl bg-muted/50 p-3 text-xs text-muted-foreground">
+                Auto-expense: €{(form.cost_price * form.current_stock).toFixed(2)} will be logged under "Products"
+              </div>
+            )}
             <Button className="w-full rounded-xl" onClick={handleAdd} disabled={saving}>
               {saving && <Loader2 className="h-4 w-4 animate-spin" />}
               Add Product
@@ -153,6 +185,13 @@ export default function InventoryPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <SellProductDialog
+        open={!!sellProduct}
+        onOpenChange={(open) => { if (!open) setSellProduct(null); }}
+        product={sellProduct}
+        onSuccess={fetchItems}
+      />
     </motion.div>
   );
 }
