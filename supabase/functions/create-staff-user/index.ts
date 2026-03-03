@@ -32,21 +32,20 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    // Explicitly pass the token to getUser for proper verification
-    const {
-      data: { user: callerUser },
-      error: userError,
-    } = await callerClient.auth.getUser(token);
-    if (userError || !callerUser) {
+    // Use getClaims to verify JWT without requiring an active session
+    const { data: claimsData, error: claimsError } = await callerClient.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims?.sub) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    const callerUserId = claimsData.claims.sub;
+
     // Check caller is admin
     const { data: roleData } = await callerClient.rpc("get_user_role", {
-      _user_id: callerUser.id,
+      _user_id: callerUserId,
     });
     if (roleData !== "admin") {
       return new Response(JSON.stringify({ error: "Only admins can create staff accounts" }), {
@@ -57,7 +56,7 @@ Deno.serve(async (req) => {
 
     // Get caller's shop
     const { data: shopId } = await callerClient.rpc("get_user_shop_id", {
-      _user_id: callerUser.id,
+      _user_id: callerUserId,
     });
     if (!shopId) {
       return new Response(JSON.stringify({ error: "No shop found for admin" }), {
