@@ -30,7 +30,7 @@ export default function ProtectedRoute() {
         if (error) throw error;
         localStorage.removeItem("pending_invite_code");
         toast.success("Welcome to the team!");
-        refetch();
+        await refetch();
       } catch (e: any) {
         console.error("Failed to accept invitation:", e);
         localStorage.removeItem("pending_invite_code");
