@@ -12,7 +12,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Plus, Pencil, Trash2, Link2, Copy, Check } from "lucide-react";
+import { Plus, Pencil, Trash2, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
 interface Staff {
@@ -24,15 +24,8 @@ interface Staff {
   role: string;
   commission_rate: number;
   is_active: boolean;
+  user_id: string | null;
   created_at: string;
-}
-
-interface Invitation {
-  id: string;
-  staff_id: string;
-  invite_code: string;
-  status: string;
-  expires_at: string;
 }
 
 const defaultForm = {
@@ -40,6 +33,7 @@ const defaultForm = {
   last_name: "",
   phone: "",
   email: "",
+  password: "",
   role: "Stylist",
   commission_rate: 0,
   is_active: true,
@@ -51,9 +45,8 @@ export default function StaffPage() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Staff | null>(null);
   const [form, setForm] = useState(defaultForm);
-  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
-  const [inviteLink, setInviteLink] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [emailError, setEmailError] = useState("");
 
   const { data: staff = [], isLoading } = useQuery({
     queryKey: ["staff"],
@@ -67,20 +60,10 @@ export default function StaffPage() {
     },
   });
 
-  const { data: invitations = [] } = useQuery({
-    queryKey: ["invitations"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("invitations")
-        .select("*");
-      if (error) throw error;
-      return data as Invitation[];
-    },
-  });
-
-  const upsert = useMutation({
-    mutationFn: async (values: typeof form & { id?: string }) => {
-      const payload: any = {
+  // Update existing staff (no auth changes)
+  const updateStaff = useMutation({
+    mutationFn: async (values: typeof form & { id: string }) => {
+      const { error } = await supabase.from("staff").update({
         first_name: values.first_name,
         last_name: values.last_name,
         phone: values.phone,
@@ -88,22 +71,62 @@ export default function StaffPage() {
         role: values.role,
         commission_rate: values.commission_rate,
         is_active: values.is_active,
-      };
-      if (values.id) {
-        const { error } = await supabase.from("staff").update(payload).eq("id", values.id);
-        if (error) throw error;
-      } else {
-        payload.shop_id = shopId;
-        const { error } = await supabase.from("staff").insert(payload);
-        if (error) throw error;
-      }
+      }).eq("id", values.id);
+      if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["staff"] });
-      toast.success(editing ? "Employee updated" : "Employee added");
+      toast.success("Employee updated");
       closeDialog();
     },
     onError: (e: Error) => toast.error(e.message),
+  });
+
+  // Create new staff via edge function
+  const createStaff = useMutation({
+    mutationFn: async (values: typeof form) => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) throw new Error("Not authenticated");
+
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-staff-user`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            email: values.email,
+            password: values.password,
+            first_name: values.first_name,
+            last_name: values.last_name,
+            phone: values.phone,
+            role: values.role,
+            commission_rate: values.commission_rate,
+          }),
+        }
+      );
+
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || "Failed to create employee account");
+      }
+      return result;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["staff"] });
+      toast.success("Employee account created. Please share the credentials with them.");
+      closeDialog();
+    },
+    onError: (e: Error) => {
+      if (e.message.includes("already in use")) {
+        setEmailError("This email is already in use.");
+      } else {
+        toast.error(e.message);
+      }
+    },
   });
 
   const remove = useMutation({
@@ -118,45 +141,11 @@ export default function StaffPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const generateInvite = async (staffMember: Staff) => {
-    const existing = invitations.find((i) => i.staff_id === staffMember.id && i.status === "pending");
-    if (existing) {
-      const link = `${window.location.origin}/join/${existing.invite_code}`;
-      setInviteLink(link);
-      setInviteDialogOpen(true);
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from("invitations")
-      .insert({
-        shop_id: shopId,
-        staff_id: staffMember.id,
-      } as any)
-      .select("invite_code")
-      .single();
-
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-
-    const link = `${window.location.origin}/join/${data.invite_code}`;
-    setInviteLink(link);
-    setInviteDialogOpen(true);
-    qc.invalidateQueries({ queryKey: ["invitations"] });
-  };
-
-  const copyLink = () => {
-    navigator.clipboard.writeText(inviteLink);
-    setCopied(true);
-    toast.success("Link copied!");
-    setTimeout(() => setCopied(false), 2000);
-  };
-
   function openAdd() {
     setEditing(null);
     setForm(defaultForm);
+    setEmailError("");
+    setShowPassword(false);
     setOpen(true);
   }
 
@@ -167,10 +156,12 @@ export default function StaffPage() {
       last_name: s.last_name,
       phone: s.phone,
       email: s.email ?? "",
+      password: "",
       role: s.role,
       commission_rate: Number(s.commission_rate),
       is_active: s.is_active,
     });
+    setEmailError("");
     setOpen(true);
   }
 
@@ -178,22 +169,29 @@ export default function StaffPage() {
     setOpen(false);
     setEditing(null);
     setForm(defaultForm);
+    setEmailError("");
   }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    upsert.mutate({ ...form, id: editing?.id });
+    setEmailError("");
+
+    if (editing) {
+      updateStaff.mutate({ ...form, id: editing.id });
+    } else {
+      if (!form.email) {
+        setEmailError("Email is required for new employees.");
+        return;
+      }
+      if (!form.password || form.password.length < 6) {
+        toast.error("Password must be at least 6 characters");
+        return;
+      }
+      createStaff.mutate(form);
+    }
   }
 
-  const getInviteStatus = (staffId: string): "accepted" | "pending" | "expired" | null => {
-    const inv = invitations.find((i) => i.staff_id === staffId);
-    if (!inv) return null;
-    if (inv.status === "accepted") return "accepted";
-    if (new Date(inv.expires_at) < new Date()) return "expired";
-    return "pending";
-  };
-
-  const hasInvite = (staffId: string) => invitations.some((i) => i.staff_id === staffId && i.status === "pending");
+  const isPending = createStaff.isPending || updateStaff.isPending;
 
   return (
     <div className="space-y-6">
@@ -216,7 +214,7 @@ export default function StaffPage() {
               <TableHead>Phone</TableHead>
               <TableHead>Commission</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="w-[140px]" />
+              <TableHead className="w-[100px]" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -234,12 +232,9 @@ export default function StaffPage() {
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
                       {s.first_name} {s.last_name}
-                      {(() => {
-                        const status = getInviteStatus(s.id);
-                        if (!status) return null;
-                        const variant = status === "accepted" ? "default" : status === "expired" ? "destructive" : "outline";
-                        return <Badge variant={variant} className="text-[10px] px-1.5 py-0">{status}</Badge>;
-                      })()}
+                      {s.user_id && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">linked</Badge>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>{s.role}</TableCell>
@@ -252,14 +247,6 @@ export default function StaffPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        title="Generate invite link"
-                        onClick={() => generateInvite(s)}
-                      >
-                        <Link2 className={`h-4 w-4 ${hasInvite(s.id) ? "text-primary" : ""}`} />
-                      </Button>
                       <Button size="icon" variant="ghost" onClick={() => openEdit(s)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -292,16 +279,56 @@ export default function StaffPage() {
                 <Input value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} required />
               </div>
             </div>
+
             <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Email {!editing && <span className="text-destructive">*</span>}</Label>
+                <Input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => {
+                    setForm({ ...form, email: e.target.value });
+                    setEmailError("");
+                  }}
+                  required={!editing}
+                  disabled={!!editing?.user_id}
+                />
+                {emailError && <p className="text-sm text-destructive">{emailError}</p>}
+              </div>
               <div className="space-y-2">
                 <Label>Phone</Label>
                 <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
               </div>
-              <div className="space-y-2">
-                <Label>Email</Label>
-                <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-              </div>
             </div>
+
+            {/* Password field only for new employees */}
+            {!editing && (
+              <div className="space-y-2">
+                <Label>Temporary Password <span className="text-destructive">*</span></Label>
+                <div className="relative">
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    value={form.password}
+                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    placeholder="Min. 6 characters"
+                    required
+                    minLength={6}
+                    className="pr-9"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  The employee will be asked to change this on first login.
+                </p>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Role</Label>
@@ -312,34 +339,14 @@ export default function StaffPage() {
                 <Input type="number" min={0} max={100} value={form.commission_rate} onChange={(e) => setForm({ ...form, commission_rate: Number(e.target.value) })} />
               </div>
             </div>
+
             <DialogFooter>
               <Button type="button" variant="outline" onClick={closeDialog}>Cancel</Button>
-              <Button type="submit" disabled={upsert.isPending}>
-                {upsert.isPending ? "Saving…" : "Save"}
+              <Button type="submit" disabled={isPending}>
+                {isPending ? "Saving…" : "Save"}
               </Button>
             </DialogFooter>
           </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Invite Link Dialog */}
-      <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Invite Link</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Share this link with the employee so they can create their account and join your shop.
-            </p>
-            <div className="flex gap-2">
-              <Input value={inviteLink} readOnly className="rounded-xl text-xs" />
-              <Button variant="outline" size="icon" onClick={copyLink} className="shrink-0">
-                {copied ? <Check className="h-4 w-4 text-primary" /> : <Copy className="h-4 w-4" />}
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">This link expires in 7 days.</p>
-          </div>
         </DialogContent>
       </Dialog>
     </div>

@@ -3,53 +3,17 @@ import { useAuth } from "@/hooks/useAuth";
 import { useShop } from "@/hooks/useShop";
 import { Navigate, Outlet } from "react-router-dom";
 import { Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import ForcePasswordChange from "@/components/ForcePasswordChange";
 
 export default function ProtectedRoute() {
-  const { session, loading: authLoading } = useAuth();
-  const { hasShop, loading: shopLoading, refetch } = useShop();
-  const [acceptingInvite, setAcceptingInvite] = useState(false);
-  const [inviteHandled, setInviteHandled] = useState(false);
+  const { session, loading: authLoading, user } = useAuth();
+  const { hasShop, loading: shopLoading } = useShop();
+  const [passwordChanged, setPasswordChanged] = useState(false);
 
-  useEffect(() => {
-    if (!session || shopLoading || hasShop || inviteHandled) return;
-
-    const pendingCode = localStorage.getItem("pending_invite_code");
-    if (!pendingCode) {
-      setInviteHandled(true);
-      return;
-    }
-
-    const accept = async () => {
-      setAcceptingInvite(true);
-      try {
-        const { error } = await supabase.rpc("accept_invitation", {
-          _invite_code: pendingCode,
-        });
-        if (error) throw error;
-        localStorage.removeItem("pending_invite_code");
-        toast.success("Welcome to the team!");
-        await refetch();
-      } catch (e: any) {
-        console.error("Failed to accept invitation:", e);
-        localStorage.removeItem("pending_invite_code");
-        toast.error(e.message || "Failed to accept invitation");
-      } finally {
-        setAcceptingInvite(false);
-        setInviteHandled(true);
-      }
-    };
-    accept();
-  }, [session, shopLoading, hasShop, inviteHandled, refetch]);
-
-  if (authLoading || (session && shopLoading) || acceptingInvite) {
+  if (authLoading || (session && shopLoading)) {
     return (
-      <div className="flex min-h-screen items-center justify-center flex-col gap-3">
+      <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        {acceptingInvite && (
-          <p className="text-sm text-muted-foreground">Linking your account to the salon…</p>
-        )}
       </div>
     );
   }
@@ -60,6 +24,12 @@ export default function ProtectedRoute() {
 
   if (!hasShop) {
     return <Navigate to="/onboarding" replace />;
+  }
+
+  // Force password change for staff created by admin
+  const requiresChange = user?.user_metadata?.requires_password_change === true;
+  if (requiresChange && !passwordChanged) {
+    return <ForcePasswordChange onComplete={() => setPasswordChanged(true)} />;
   }
 
   return <Outlet />;

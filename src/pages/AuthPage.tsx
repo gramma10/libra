@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Scissors, Mail, Lock, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,8 +11,6 @@ import { toast } from "sonner";
 
 export default function AuthPage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const inviteCode = searchParams.get("invite");
   const { session } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
@@ -21,7 +19,6 @@ export default function AuthPage() {
 
   useEffect(() => {
     if (session) {
-      // If there's a pending invite, go to dashboard — ProtectedRoute handles acceptance
       navigate("/", { replace: true });
     }
   }, [session, navigate]);
@@ -40,9 +37,7 @@ export default function AuthPage() {
           email,
           password,
           options: {
-            emailRedirectTo: inviteCode
-              ? `${window.location.origin}/join/${inviteCode}`
-              : window.location.origin,
+            emailRedirectTo: window.location.origin,
           },
         });
         if (error) throw error;
@@ -69,11 +64,7 @@ export default function AuthPage() {
           </div>
           <h1 className="text-2xl font-semibold tracking-tight">Studio</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {inviteCode
-              ? "Create an account or sign in to join your salon"
-              : isLogin
-                ? "Sign in to your dashboard"
-                : "Create your account"}
+            {isLogin ? "Sign in to your dashboard" : "Create your account"}
           </p>
         </div>
 

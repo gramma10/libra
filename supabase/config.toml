@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.check-reminders]
 verify_jwt = false
+
+[functions.create-staff-user]
+verify_jwt = false
