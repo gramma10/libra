@@ -9,12 +9,12 @@ import DashboardLayout from "@/components/DashboardLayout";
 import CalendarPage from "@/pages/CalendarPage";
 import ClientsPage from "@/pages/ClientsPage";
 import InventoryPage from "@/pages/InventoryPage";
-
 import ReportsPage from "@/pages/ReportsPage";
 import SettingsPage from "@/pages/SettingsPage";
 import ServicesPage from "@/pages/ServicesPage";
 import StaffPage from "@/pages/StaffPage";
 import ExpensesPage from "@/pages/ExpensesPage";
+import MyStatsPage from "@/pages/MyStatsPage";
 import BookingWidget from "@/pages/BookingWidget";
 import AuthPage from "@/pages/AuthPage";
 import NotFound from "./pages/NotFound";
@@ -40,11 +40,11 @@ const App = () => (
                 <Route path="/clients" element={<ClientsPage />} />
                 <Route path="/inventory" element={<InventoryPage />} />
                 <Route path="/expenses" element={<ExpensesPage />} />
-                
                 <Route path="/reports" element={<ReportsPage />} />
                 <Route path="/services" element={<ServicesPage />} />
                 <Route path="/staff" element={<StaffPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/my-stats" element={<MyStatsPage />} />
               </Route>
             </Route>
 
