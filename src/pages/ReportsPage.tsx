@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
-import { DollarSign, Calendar, UserX, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Loader2, Wallet } from "lucide-react";
+import { DollarSign, UserX, TrendingDown, Loader2, Wallet } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import ReportsCalendar from "@/components/reports/ReportsCalendar";
 import StatCard from "@/components/reports/StatCard";
+import RevenuePieChart from "@/components/reports/RevenuePieChart";
 
 const formatCurrency = (v: number) => `€${v.toFixed(0)}`;
 const monthLabel = (d: Date) => d.toLocaleString("default", { month: "long", year: "numeric" });
@@ -26,6 +26,18 @@ interface StaffMember {
   commission_rate: number;
 }
 
+interface ProductSale {
+  total_amount: number;
+  sale_date: string;
+  inventory_id: string;
+  inventory?: { product_name: string } | null;
+}
+
+interface Expense {
+  amount: number;
+  category: string;
+}
+
 const isRevenueEligible = (a: Appointment, now: Date) =>
   a.status !== "Cancelled" && a.status !== "No-Show" && new Date(a.end_time) <= now;
 
@@ -37,7 +49,9 @@ export default function ReportsPage() {
   const [viewDate, setViewDate] = useState(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [monthExpenses, setMonthExpenses] = useState(0);
+  const [expensesByCategory, setExpensesByCategory] = useState<Record<string, number>>({});
   const [staffMap, setStaffMap] = useState<Record<string, number>>({});
+  const [productSales, setProductSales] = useState<ProductSale[]>([]);
 
   const now = useMemo(() => new Date(), []);
 
@@ -50,7 +64,7 @@ export default function ReportsPage() {
     const startDate = start.toISOString().split("T")[0];
     const endDate = end.toISOString().split("T")[0];
 
-    const [apptRes, expRes, staffRes] = await Promise.all([
+    const [apptRes, expRes, staffRes, salesRes] = await Promise.all([
       supabase
         .from("appointments")
         .select("id, start_time, end_time, status, is_paid, service_id, staff_id, services(price, service_name)")
@@ -59,18 +73,30 @@ export default function ReportsPage() {
         .order("start_time"),
       supabase
         .from("expenses")
-        .select("amount")
+        .select("amount, category")
         .gte("date", startDate)
         .lte("date", endDate),
       supabase.from("staff").select("id, commission_rate"),
+      supabase
+        .from("product_sales")
+        .select("total_amount, sale_date, inventory_id, inventory(product_name)")
+        .gte("sale_date", startDate)
+        .lte("sale_date", endDate),
     ]);
 
     setAppointments((apptRes.data as Appointment[]) || []);
-    setMonthExpenses((expRes.data || []).reduce((s: number, e: any) => s + Number(e.amount), 0));
+
+    const expenses = (expRes.data as Expense[]) || [];
+    setMonthExpenses(expenses.reduce((s, e) => s + Number(e.amount), 0));
+    const catMap: Record<string, number> = {};
+    expenses.forEach((e) => { catMap[e.category] = (catMap[e.category] || 0) + Number(e.amount); });
+    setExpensesByCategory(catMap);
 
     const map: Record<string, number> = {};
-    (staffRes.data as StaffMember[] || []).forEach((s) => { map[s.id] = Number(s.commission_rate); });
+    ((staffRes.data as StaffMember[]) || []).forEach((s) => { map[s.id] = Number(s.commission_rate); });
     setStaffMap(map);
+
+    setProductSales((salesRes.data as ProductSale[]) || []);
 
     setLoading(false);
   }, [viewDate]);
@@ -84,11 +110,12 @@ export default function ReportsPage() {
   };
 
   // --- Stats ---
-  const monthRevenue = sumRevenue(appointments, now);
+  const serviceRevenue = sumRevenue(appointments, now);
+  const productRevenue = productSales.reduce((s, p) => s + Number(p.total_amount), 0);
+  const monthRevenue = serviceRevenue + productRevenue;
   const monthAppts = appointments.filter((a) => a.status !== "Cancelled").length;
   const monthNoShows = appointments.filter((a) => a.status === "No-Show").length;
 
-  // Automated commissions
   const monthCommissions = useMemo(() => {
     return appointments
       .filter((a) => isRevenueEligible(a, now) && a.staff_id && a.services?.price)
@@ -129,8 +156,13 @@ export default function ReportsPage() {
       const key = new Date(a.start_time).toDateString();
       map[key] = (map[key] || 0) + Number(a.services?.price || 0);
     });
+    // Add product sales to daily revenue
+    productSales.forEach((s) => {
+      const key = new Date(s.sale_date + "T00:00:00").toDateString();
+      map[key] = (map[key] || 0) + Number(s.total_amount);
+    });
     return map;
-  }, [appointments, now]);
+  }, [appointments, productSales, now]);
 
   const dailyCount = useMemo(() => {
     const map: Record<string, number> = {};
@@ -142,16 +174,42 @@ export default function ReportsPage() {
     return map;
   }, [appointments]);
 
-  // Bar chart data — last 6 months placeholder using current month data
+  // Bar chart
   const chartData = useMemo(() => {
     const d = new Date(viewDate);
-    return [
-      { name: monthLabel(d).split(" ")[0], Revenue: monthRevenue, Expenses: totalExpenses },
-    ];
+    return [{ name: monthLabel(d).split(" ")[0], Revenue: monthRevenue, Expenses: totalExpenses }];
   }, [viewDate, monthRevenue, totalExpenses]);
 
+  // Pie chart data — Revenue breakdown
+  const revenuePieData = useMemo(() => {
+    // Group service revenue by service name
+    const serviceMap: Record<string, number> = {};
+    appointments.filter((a) => isRevenueEligible(a, now)).forEach((a) => {
+      const name = a.services?.service_name || "Other Service";
+      serviceMap[name] = (serviceMap[name] || 0) + Number(a.services?.price || 0);
+    });
+    const entries = Object.entries(serviceMap).map(([name, value]) => ({ name, value }));
+    if (productRevenue > 0) entries.push({ name: "Product Sales", value: productRevenue });
+    return entries;
+  }, [appointments, productRevenue, now]);
+
+  // Pie chart data — Expenses breakdown
+  const expensesPieData = useMemo(() => {
+    const entries: { name: string; value: number }[] = [];
+    // Operational expenses (excluding Products which is inventory)
+    const operationalCats = ["Rent", "Electricity", "Water", "Marketing", "Salaries", "Other"];
+    operationalCats.forEach((cat) => {
+      const val = expensesByCategory[cat] || 0;
+      if (val > 0) entries.push({ name: cat, value: val });
+    });
+    const inventoryCost = expensesByCategory["Products"] || 0;
+    if (inventoryCost > 0) entries.push({ name: "Inventory Costs", value: inventoryCost });
+    if (monthCommissions > 0) entries.push({ name: "Staff Commissions", value: monthCommissions });
+    return entries;
+  }, [expensesByCategory, monthCommissions]);
+
   const stats = [
-    { label: "Month Revenue", value: formatCurrency(monthRevenue), icon: DollarSign, color: "hsl(var(--success))" },
+    { label: "Month Revenue", value: formatCurrency(monthRevenue), icon: DollarSign, color: "hsl(var(--success))", subtitle: `Services: €${serviceRevenue.toFixed(0)} · Products: €${productRevenue.toFixed(0)}` },
     { label: "Total Expenses", value: formatCurrency(totalExpenses), icon: TrendingDown, color: "hsl(var(--destructive))", subtitle: `Manual: €${monthExpenses.toFixed(0)} · Commissions: €${monthCommissions.toFixed(0)}` },
     { label: "Net Profit", value: formatCurrency(netProfit), icon: Wallet, color: netProfit >= 0 ? "hsl(var(--success))" : "hsl(var(--destructive))", highlight: true, positive: netProfit >= 0 },
     { label: "No-Shows", value: String(monthNoShows), icon: UserX, color: "hsl(var(--destructive))" },
@@ -168,14 +226,12 @@ export default function ReportsPage() {
         <p className="text-sm text-muted-foreground mt-0.5">Revenue, expenses &amp; profit insights</p>
       </div>
 
-      {/* Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, i) => (
           <StatCard key={stat.label} stat={stat} index={i} />
         ))}
       </div>
 
-      {/* Weekly summary bar */}
       <div className="rounded-2xl border border-border bg-card p-4 shadow-apple flex items-center justify-between">
         <div>
           <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">This Week</p>
@@ -187,7 +243,7 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {/* Revenue vs Expenses Chart */}
+      {/* Bar Chart */}
       <div className="rounded-2xl border border-border bg-card p-5 shadow-apple">
         <h3 className="text-sm font-semibold mb-4">Revenue vs Expenses</h3>
         <ResponsiveContainer width="100%" height={220}>
@@ -201,6 +257,12 @@ export default function ReportsPage() {
             <Bar dataKey="Expenses" fill="hsl(0 72% 51%)" radius={[6, 6, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
+      </div>
+
+      {/* Pie Charts */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <RevenuePieChart data={revenuePieData} title="Revenue Breakdown" />
+        <RevenuePieChart data={expensesPieData} title="Expenses Breakdown" />
       </div>
 
       {/* Calendar */}
