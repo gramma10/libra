@@ -14,6 +14,7 @@ import ReportsPage from "@/pages/ReportsPage";
 import SettingsPage from "@/pages/SettingsPage";
 import ServicesPage from "@/pages/ServicesPage";
 import StaffPage from "@/pages/StaffPage";
+import ExpensesPage from "@/pages/ExpensesPage";
 import BookingWidget from "@/pages/BookingWidget";
 import AuthPage from "@/pages/AuthPage";
 import NotFound from "./pages/NotFound";
@@ -38,6 +39,7 @@ const App = () => (
                 <Route path="/" element={<CalendarPage />} />
                 <Route path="/clients" element={<ClientsPage />} />
                 <Route path="/inventory" element={<InventoryPage />} />
+                <Route path="/expenses" element={<ExpensesPage />} />
                 <Route path="/marketing" element={<MarketingPage />} />
                 <Route path="/reports" element={<ReportsPage />} />
                 <Route path="/services" element={<ServicesPage />} />
