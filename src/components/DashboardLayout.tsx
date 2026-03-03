@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Outlet } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 import {
   CalendarDays,
   Users,
@@ -12,24 +13,63 @@ import {
   Sparkles,
   UserCog,
   Receipt,
+  User,
+  LogOut,
 } from "lucide-react";
 import { SidebarNavItem } from "@/components/SidebarNavItem";
 import { cn } from "@/lib/utils";
-
-const navItems = [
-  { to: "/", icon: CalendarDays, label: "Calendar" },
-  { to: "/clients", icon: Users, label: "Clients" },
-  { to: "/services", icon: Sparkles, label: "Services" },
-  { to: "/staff", icon: UserCog, label: "Employees" },
-  { to: "/inventory", icon: Package, label: "Inventory" },
-  { to: "/expenses", icon: Receipt, label: "Expenses" },
-  
-  { to: "/reports", icon: BarChart3, label: "Reports" },
-  { to: "/settings", icon: Settings, label: "Settings" },
-];
+import { useRole } from "@/hooks/useRole";
 
 export default function DashboardLayout() {
+  const { signOut } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
+  const { isAdmin, isManager, isStaff, loading: roleLoading } = useRole();
+
+  // Build nav items based on role
+  const navItems = [];
+
+  // Calendar — everyone
+  navItems.push({ to: "/", icon: CalendarDays, label: "Calendar" });
+
+  // Clients — admin & manager
+  if (isAdmin || isManager) {
+    navItems.push({ to: "/clients", icon: Users, label: "Clients" });
+  }
+
+  // Services — admin only
+  if (isAdmin) {
+    navItems.push({ to: "/services", icon: Sparkles, label: "Services" });
+  }
+
+  // Employees — admin only
+  if (isAdmin) {
+    navItems.push({ to: "/staff", icon: UserCog, label: "Employees" });
+  }
+
+  // Inventory — admin & manager
+  if (isAdmin || isManager) {
+    navItems.push({ to: "/inventory", icon: Package, label: "Inventory" });
+  }
+
+  // Expenses — admin only
+  if (isAdmin) {
+    navItems.push({ to: "/expenses", icon: Receipt, label: "Expenses" });
+  }
+
+  // Reports — admin only
+  if (isAdmin) {
+    navItems.push({ to: "/reports", icon: BarChart3, label: "Reports" });
+  }
+
+  // My Stats — staff only
+  if (isStaff) {
+    navItems.push({ to: "/my-stats", icon: User, label: "My Stats" });
+  }
+
+  // Settings — admin only
+  if (isAdmin) {
+    navItems.push({ to: "/settings", icon: Settings, label: "Settings" });
+  }
 
   return (
     <div className="flex min-h-screen w-full">
@@ -59,8 +99,8 @@ export default function DashboardLayout() {
           ))}
         </nav>
 
-        {/* Collapse toggle */}
-        <div className="border-t border-border/50 p-3">
+        {/* Bottom actions */}
+        <div className="border-t border-border/50 p-3 space-y-1">
           <button
             onClick={() => setCollapsed(!collapsed)}
             className="flex w-full items-center justify-center rounded-xl p-2.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
@@ -70,6 +110,16 @@ export default function DashboardLayout() {
             ) : (
               <PanelLeftClose className="h-[18px] w-[18px]" strokeWidth={1.5} />
             )}
+          </button>
+          <button
+            onClick={signOut}
+            className={cn(
+              "flex w-full items-center gap-3 rounded-xl p-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive",
+              collapsed && "justify-center"
+            )}
+          >
+            <LogOut className="h-[18px] w-[18px] shrink-0" strokeWidth={1.5} />
+            {!collapsed && <span>Sign Out</span>}
           </button>
         </div>
       </aside>

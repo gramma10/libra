@@ -6,6 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import ReportsCalendar from "@/components/reports/ReportsCalendar";
 import StatCard from "@/components/reports/StatCard";
 import RevenuePieChart from "@/components/reports/RevenuePieChart";
+import { useRole } from "@/hooks/useRole";
 
 const formatCurrency = (v: number) => `€${v.toFixed(0)}`;
 const monthLabel = (d: Date) => d.toLocaleString("default", { month: "long", year: "numeric" });
@@ -45,6 +46,7 @@ const sumRevenue = (appts: Appointment[], now: Date) =>
   appts.filter((a) => isRevenueEligible(a, now)).reduce((s, a) => s + Number(a.services?.price || 0), 0);
 
 export default function ReportsPage() {
+  const { isAdmin } = useRole();
   const [loading, setLoading] = useState(true);
   const [viewDate, setViewDate] = useState(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -210,8 +212,10 @@ export default function ReportsPage() {
 
   const stats = [
     { label: "Month Revenue", value: formatCurrency(monthRevenue), icon: DollarSign, color: "hsl(var(--success))", subtitle: `Services: €${serviceRevenue.toFixed(0)} · Products: €${productRevenue.toFixed(0)}` },
-    { label: "Total Expenses", value: formatCurrency(totalExpenses), icon: TrendingDown, color: "hsl(var(--destructive))", subtitle: `Manual: €${monthExpenses.toFixed(0)} · Commissions: €${monthCommissions.toFixed(0)}` },
-    { label: "Net Profit", value: formatCurrency(netProfit), icon: Wallet, color: netProfit >= 0 ? "hsl(var(--success))" : "hsl(var(--destructive))", highlight: true, positive: netProfit >= 0 },
+    ...(isAdmin ? [
+      { label: "Total Expenses", value: formatCurrency(totalExpenses), icon: TrendingDown, color: "hsl(var(--destructive))", subtitle: `Manual: €${monthExpenses.toFixed(0)} · Commissions: €${monthCommissions.toFixed(0)}` },
+      { label: "Net Profit", value: formatCurrency(netProfit), icon: Wallet, color: netProfit >= 0 ? "hsl(var(--success))" : "hsl(var(--destructive))", highlight: true, positive: netProfit >= 0 },
+    ] : []),
     { label: "No-Shows", value: String(monthNoShows), icon: UserX, color: "hsl(var(--destructive))" },
   ];
 
@@ -259,11 +263,13 @@ export default function ReportsPage() {
         </ResponsiveContainer>
       </div>
 
-      {/* Pie Charts */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <RevenuePieChart data={revenuePieData} title="Revenue Breakdown" />
-        <RevenuePieChart data={expensesPieData} title="Expenses Breakdown" />
-      </div>
+      {/* Pie Charts — admin only */}
+      {isAdmin && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <RevenuePieChart data={revenuePieData} title="Revenue Breakdown" />
+          <RevenuePieChart data={expensesPieData} title="Expenses Breakdown" />
+        </div>
+      )}
 
       {/* Calendar */}
       <ReportsCalendar

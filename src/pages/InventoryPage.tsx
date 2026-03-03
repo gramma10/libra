@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import SellProductDialog from "@/components/inventory/SellProductDialog";
 import StatCard from "@/components/reports/StatCard";
+import { useRole } from "@/hooks/useRole";
 
 interface InventoryItem {
   id: string;
@@ -34,6 +35,7 @@ interface Expense {
 }
 
 export default function InventoryPage() {
+  const { isAdmin } = useRole();
   const [search, setSearch] = useState("");
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [sales, setSales] = useState<ProductSale[]>([]);
@@ -143,8 +145,10 @@ export default function InventoryPage() {
     setSaving(false);
   };
 
-  const stats = [
+  const stats = isAdmin ? [
     { label: "Monthly Stock Investment", value: `€${monthExpenses.toFixed(0)}`, icon: Package, color: "hsl(var(--warning))" },
+    { label: "Monthly Product Sales", value: `€${monthSalesTotal.toFixed(0)}`, icon: TrendingUp, color: "hsl(var(--success))" },
+  ] : [
     { label: "Monthly Product Sales", value: `€${monthSalesTotal.toFixed(0)}`, icon: TrendingUp, color: "hsl(var(--success))" },
   ];
 
@@ -155,10 +159,12 @@ export default function InventoryPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Inventory</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{items.length} products · {lowStock.length} low stock</p>
         </div>
-        <Button className="rounded-xl gap-2" onClick={openAdd}>
-          <Plus className="h-4 w-4" strokeWidth={1.5} />
-          Add Product
-        </Button>
+        {isAdmin && (
+          <Button className="rounded-xl gap-2" onClick={openAdd}>
+            <Plus className="h-4 w-4" strokeWidth={1.5} />
+            Add Product
+          </Button>
+        )}
       </div>
 
       {/* Summary Cards */}
@@ -193,7 +199,7 @@ export default function InventoryPage() {
                 <th className="text-left p-4 font-medium">Product</th>
                 <th className="text-left p-4 font-medium">SKU</th>
                 <th className="text-left p-4 font-medium">Stock</th>
-                <th className="text-left p-4 font-medium">Cost</th>
+                {isAdmin && <th className="text-left p-4 font-medium">Cost</th>}
                 <th className="text-left p-4 font-medium">Retail</th>
                 <th className="text-left p-4 font-medium">Total Sales</th>
                 <th className="text-right p-4 font-medium">Actions</th>
@@ -217,17 +223,19 @@ export default function InventoryPage() {
                         {isLow && <AlertTriangle className="h-3.5 w-3.5 text-destructive" strokeWidth={1.5} />}
                       </div>
                     </td>
-                    <td className="p-4 text-sm">€{Number(item.cost_price).toFixed(2)}</td>
+                    {isAdmin && <td className="p-4 text-sm">€{Number(item.cost_price).toFixed(2)}</td>}
                     <td className="p-4 text-sm">€{Number(item.retail_price).toFixed(2)}</td>
                     <td className="p-4 text-sm font-semibold" style={{ color: totalRevenue > 0 ? "hsl(var(--success))" : undefined }}>
                       €{totalRevenue.toFixed(2)}
                     </td>
                     <td className="p-4 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="sm" className="rounded-lg gap-1.5 text-xs" onClick={() => openEdit(item)}>
-                          <Pencil className="h-3.5 w-3.5" strokeWidth={1.5} />
-                          Edit
-                        </Button>
+                        {isAdmin && (
+                          <Button variant="ghost" size="sm" className="rounded-lg gap-1.5 text-xs" onClick={() => openEdit(item)}>
+                            <Pencil className="h-3.5 w-3.5" strokeWidth={1.5} />
+                            Edit
+                          </Button>
+                        )}
                         <Button variant="ghost" size="sm" className="rounded-lg gap-1.5 text-xs" onClick={() => setSellProduct(item)} disabled={item.current_stock <= 0}>
                           <ShoppingBag className="h-3.5 w-3.5" strokeWidth={1.5} />
                           Sell

@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useRole } from "@/hooks/useRole";
 
 interface EditBookingDialogProps {
   open: boolean;
@@ -18,6 +19,7 @@ interface EditBookingDialogProps {
 }
 
 export default function EditBookingDialog({ open, onOpenChange, appointment, services, staff, onUpdated }: EditBookingDialogProps) {
+  const { isAdmin, isManager, isStaff, staffRecordId } = useRole();
   const [serviceId, setServiceId] = useState("");
   const [staffId, setStaffId] = useState("");
   const [startTime, setStartTime] = useState("");
@@ -79,6 +81,11 @@ export default function EditBookingDialog({ open, onOpenChange, appointment, ser
   };
 
   if (!appointment) return null;
+
+  // Staff can only edit their own appointments
+  const isOwnAppointment = isStaff && appointment.staff_id === staffRecordId;
+  const canEdit = isAdmin || isManager || isOwnAppointment;
+  const canDelete = isAdmin || isManager || isOwnAppointment;
 
   const client = appointment.clients;
   const clientName = `${client?.first_name || ""} ${client?.last_name || ""}`.trim();
@@ -167,20 +174,28 @@ export default function EditBookingDialog({ open, onOpenChange, appointment, ser
             {isNoShow ? "Marked as No-Show" : "Mark as No-Show"}
           </Button>
 
-          <div className="flex gap-3">
-            {!confirmDelete ? (
-              <Button variant="destructive" size="icon" className="rounded-xl" onClick={() => setConfirmDelete(true)}>
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            ) : (
-              <Button variant="destructive" className="rounded-xl" onClick={handleDelete} disabled={deleting}>
-                {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Delete"}
-              </Button>
-            )}
-            <Button className="rounded-xl flex-1" onClick={handleSave} disabled={saving}>
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Changes"}
-            </Button>
-          </div>
+          {canEdit ? (
+            <>
+              <div className="flex gap-3">
+                {canDelete && (
+                  !confirmDelete ? (
+                    <Button variant="destructive" size="icon" className="rounded-xl" onClick={() => setConfirmDelete(true)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  ) : (
+                    <Button variant="destructive" className="rounded-xl" onClick={handleDelete} disabled={deleting}>
+                      {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Delete"}
+                    </Button>
+                  )
+                )}
+                <Button className="rounded-xl flex-1" onClick={handleSave} disabled={saving}>
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Changes"}
+                </Button>
+              </div>
+            </>
+          ) : (
+            <p className="text-xs text-muted-foreground text-center">You can only view this appointment. Edit is restricted to your own appointments.</p>
+          )}
         </div>
       </DialogContent>
     </Dialog>
