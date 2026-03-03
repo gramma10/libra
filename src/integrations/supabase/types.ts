@@ -24,6 +24,7 @@ export type Database = {
           is_paid: boolean
           reminder_sent: boolean
           service_id: string | null
+          shop_id: string
           staff_id: string | null
           start_time: string
           status: Database["public"]["Enums"]["appointment_status"]
@@ -37,6 +38,7 @@ export type Database = {
           is_paid?: boolean
           reminder_sent?: boolean
           service_id?: string | null
+          shop_id: string
           staff_id?: string | null
           start_time: string
           status?: Database["public"]["Enums"]["appointment_status"]
@@ -50,6 +52,7 @@ export type Database = {
           is_paid?: boolean
           reminder_sent?: boolean
           service_id?: string | null
+          shop_id?: string
           staff_id?: string | null
           start_time?: string
           status?: Database["public"]["Enums"]["appointment_status"]
@@ -69,6 +72,13 @@ export type Database = {
             referencedRelation: "services"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "appointments_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
         ]
       }
       business_settings: {
@@ -80,6 +90,7 @@ export type Database = {
           id: string
           logo_url: string | null
           operating_hours: Json | null
+          shop_id: string
           shop_name: string
           sms_enabled: boolean
           sms_provider_api: string | null
@@ -93,6 +104,7 @@ export type Database = {
           id?: string
           logo_url?: string | null
           operating_hours?: Json | null
+          shop_id: string
           shop_name?: string
           sms_enabled?: boolean
           sms_provider_api?: string | null
@@ -106,12 +118,21 @@ export type Database = {
           id?: string
           logo_url?: string | null
           operating_hours?: Json | null
+          shop_id?: string
           shop_name?: string
           sms_enabled?: boolean
           sms_provider_api?: string | null
           theme_style?: Database["public"]["Enums"]["theme_style"]
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "business_settings_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       clients: {
         Row: {
@@ -125,6 +146,7 @@ export type Database = {
           nameday_date: string | null
           personal_preferences: string | null
           phone_mobile: string
+          shop_id: string
           tech_notes: string | null
           total_spent: number
         }
@@ -139,6 +161,7 @@ export type Database = {
           nameday_date?: string | null
           personal_preferences?: string | null
           phone_mobile: string
+          shop_id: string
           tech_notes?: string | null
           total_spent?: number
         }
@@ -153,10 +176,19 @@ export type Database = {
           nameday_date?: string | null
           personal_preferences?: string | null
           phone_mobile?: string
+          shop_id?: string
           tech_notes?: string | null
           total_spent?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "clients_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       expenses: {
         Row: {
@@ -166,6 +198,7 @@ export type Database = {
           date: string
           description: string | null
           id: string
+          shop_id: string
           status: Database["public"]["Enums"]["expense_status"]
         }
         Insert: {
@@ -175,6 +208,7 @@ export type Database = {
           date?: string
           description?: string | null
           id?: string
+          shop_id: string
           status?: Database["public"]["Enums"]["expense_status"]
         }
         Update: {
@@ -184,9 +218,18 @@ export type Database = {
           date?: string
           description?: string | null
           id?: string
+          shop_id?: string
           status?: Database["public"]["Enums"]["expense_status"]
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "expenses_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       inventory: {
         Row: {
@@ -197,6 +240,7 @@ export type Database = {
           min_stock_level: number
           product_name: string
           retail_price: number
+          shop_id: string
           sku: string | null
         }
         Insert: {
@@ -207,6 +251,7 @@ export type Database = {
           min_stock_level?: number
           product_name: string
           retail_price?: number
+          shop_id: string
           sku?: string | null
         }
         Update: {
@@ -217,9 +262,63 @@ export type Database = {
           min_stock_level?: number
           product_name?: string
           retail_price?: number
+          shop_id?: string
           sku?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "inventory_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invitations: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          invite_code: string
+          shop_id: string
+          staff_id: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          invite_code?: string
+          shop_id: string
+          staff_id: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          invite_code?: string
+          shop_id?: string
+          staff_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invitations_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invitations_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       product_sales: {
         Row: {
@@ -228,6 +327,7 @@ export type Database = {
           inventory_id: string
           quantity: number
           sale_date: string
+          shop_id: string
           total_amount: number
           unit_price: number
         }
@@ -237,6 +337,7 @@ export type Database = {
           inventory_id: string
           quantity: number
           sale_date?: string
+          shop_id: string
           total_amount: number
           unit_price: number
         }
@@ -246,6 +347,7 @@ export type Database = {
           inventory_id?: string
           quantity?: number
           sale_date?: string
+          shop_id?: string
           total_amount?: number
           unit_price?: number
         }
@@ -255,6 +357,13 @@ export type Database = {
             columns: ["inventory_id"]
             isOneToOne: false
             referencedRelation: "inventory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_sales_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
             referencedColumns: ["id"]
           },
         ]
@@ -268,6 +377,7 @@ export type Database = {
           price: number
           required_products: Json | null
           service_name: string
+          shop_id: string
         }
         Insert: {
           category_color?: string
@@ -277,6 +387,7 @@ export type Database = {
           price?: number
           required_products?: Json | null
           service_name: string
+          shop_id: string
         }
         Update: {
           category_color?: string
@@ -286,6 +397,74 @@ export type Database = {
           price?: number
           required_products?: Json | null
           service_name?: string
+          shop_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "services_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shop_members: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          shop_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          shop_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          shop_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_members_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shops: {
+        Row: {
+          address: string | null
+          created_at: string
+          id: string
+          name: string
+          owner_id: string | null
+          slug: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          owner_id?: string | null
+          slug: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          owner_id?: string | null
+          slug?: string
         }
         Relationships: []
       }
@@ -300,6 +479,7 @@ export type Database = {
           last_name: string
           phone: string
           role: string
+          shop_id: string
           user_id: string | null
         }
         Insert: {
@@ -312,6 +492,7 @@ export type Database = {
           last_name: string
           phone?: string
           role?: string
+          shop_id: string
           user_id?: string | null
         }
         Update: {
@@ -324,9 +505,18 @@ export type Database = {
           last_name?: string
           phone?: string
           role?: string
+          shop_id?: string
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "staff_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       transactions: {
         Row: {
@@ -335,6 +525,7 @@ export type Database = {
           created_at: string
           id: string
           payment_method: Database["public"]["Enums"]["payment_method"]
+          shop_id: string
           staff_commission: number
         }
         Insert: {
@@ -343,6 +534,7 @@ export type Database = {
           created_at?: string
           id?: string
           payment_method?: Database["public"]["Enums"]["payment_method"]
+          shop_id: string
           staff_commission?: number
         }
         Update: {
@@ -351,6 +543,7 @@ export type Database = {
           created_at?: string
           id?: string
           payment_method?: Database["public"]["Enums"]["payment_method"]
+          shop_id?: string
           staff_commission?: number
         }
         Relationships: [
@@ -359,6 +552,13 @@ export type Database = {
             columns: ["appointment_id"]
             isOneToOne: false
             referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
             referencedColumns: ["id"]
           },
         ]
@@ -389,7 +589,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_invitation: { Args: { _invite_code: string }; Returns: Json }
+      create_shop: { Args: { _name: string; _slug: string }; Returns: string }
       get_user_role: { Args: { _user_id: string }; Returns: string }
+      get_user_shop_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

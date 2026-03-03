@@ -30,14 +30,14 @@ export function useRole(): RoleState {
     const fetchRole = async () => {
       setLoading(true);
 
-      // Fetch role from user_roles table
-      const { data: roleData } = await supabase
-        .from("user_roles")
+      // Fetch role from shop_members table (replaces user_roles)
+      const { data: memberData } = await supabase
+        .from("shop_members")
         .select("role")
         .eq("user_id", user.id)
         .maybeSingle();
 
-      const userRole = (roleData?.role as AppRole) || null;
+      const userRole = (memberData?.role as AppRole) || null;
       setRole(userRole);
 
       // If staff, find linked staff record

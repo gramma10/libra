@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useShop } from "@/hooks/useShop";
 import CalendarHeader, { CalendarView } from "@/components/calendar/CalendarHeader";
 import DayView from "@/components/calendar/DayView";
 import WeekView from "@/components/calendar/WeekView";
@@ -12,6 +13,7 @@ import EditBookingDialog from "@/components/calendar/EditBookingDialog";
 const today = new Date();
 
 export default function CalendarPage() {
+  const { shopId } = useShop();
   const [currentDate, setCurrentDate] = useState(today);
   const [view, setView] = useState<CalendarView>("day");
   const [appointments, setAppointments] = useState<any[]>([]);
@@ -100,7 +102,7 @@ export default function CalendarPage() {
         <MonthView date={currentDate} appointments={appointments} onDayClick={(day) => { setCurrentDate(day); setView("day"); }} />
       )}
 
-      <NewBookingDialog open={showNewBooking} onOpenChange={setShowNewBooking} currentDate={bookingDate} prefillStaffId={prefillStaffId} prefillTime={prefillTime} services={services} staff={staff} onCreated={fetchData} />
+      <NewBookingDialog open={showNewBooking} onOpenChange={setShowNewBooking} currentDate={bookingDate} prefillStaffId={prefillStaffId} prefillTime={prefillTime} services={services} staff={staff} onCreated={fetchData} shopId={shopId || ""} />
       <EditBookingDialog open={!!editingAppointment} onOpenChange={(open) => { if (!open) setEditingAppointment(null); }} appointment={editingAppointment} services={services} staff={staff} onUpdated={fetchData} />
     </motion.div>
   );

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Scissors, ChevronRight, Calendar, Clock, Check, Loader2, User, Users, Phone, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,8 @@ const ANYONE_STAFF = { id: "anyone", first_name: "Anyone", last_name: "", role: 
 type Step = "service" | "barber" | "date" | "time" | "info" | "confirm";
 
 export default function BookingWidget() {
+  const { slug } = useParams<{ slug: string }>();
+  const [shopId, setShopId] = useState<string | null>(null);
   const [step, setStep] = useState<Step>("service");
   const [services, setServices] = useState<any[]>([]);
   const [staffList, setStaffList] = useState<any[]>([]);
@@ -87,11 +90,25 @@ export default function BookingWidget() {
   })();
 
   useEffect(() => {
-    Promise.all([
-      supabase.from("services").select("*").order("service_name"),
-      supabase.from("staff").select("*").eq("is_active", true).order("first_name"),
-      supabase.from("business_settings").select("logo_url, shop_name, operating_hours").limit(1).single(),
-    ]).then(([svcRes, staffRes, settingsRes]) => {
+    const init = async () => {
+      // Resolve shop_id from slug or use first available
+      let resolvedShopId: string | null = null;
+      if (slug) {
+        const { data: shop } = await supabase.from("shops").select("id").eq("slug", slug).maybeSingle();
+        resolvedShopId = shop?.id || null;
+      }
+      if (!resolvedShopId) {
+        const { data: shop } = await supabase.from("shops").select("id").limit(1).single();
+        resolvedShopId = shop?.id || null;
+      }
+      setShopId(resolvedShopId);
+
+      const filter = resolvedShopId ? { shop_id: resolvedShopId } : {};
+      const [svcRes, staffRes, settingsRes] = await Promise.all([
+        supabase.from("services").select("*").match(filter).order("service_name"),
+        supabase.from("staff").select("*").match(filter).eq("is_active", true).order("first_name"),
+        supabase.from("business_settings").select("logo_url, shop_name, operating_hours").match(filter).limit(1).single(),
+      ]);
       setServices(svcRes.data || []);
       setStaffList(staffRes.data || []);
       if (settingsRes.data) {
@@ -102,8 +119,9 @@ export default function BookingWidget() {
         }
       }
       setLoading(false);
-    });
-  }, []);
+    };
+    init();
+  }, [slug]);
 
   const normalizePhone = (raw: string) => {
     let p = raw.replace(/[\s\-()]/g, "");
@@ -260,6 +278,7 @@ export default function BookingWidget() {
         last_name: clientInfo.last_name || "",
         phone_mobile: normalizedPhone || clientInfo.phone_mobile,
         email: clientInfo.email,
+        shop_id: shopId!,
       }).select("id").single();
       if (error || !newClient) {
         toast.error("Could not create client: " + (error?.message || "Unknown error"));
@@ -275,6 +294,7 @@ export default function BookingWidget() {
       staff_id: staffIdToUse || null,
       start_time: startDt.toISOString(),
       end_time: endDt.toISOString(),
+      shop_id: shopId!,
     });
 
     if (error) toast.error(error.message);

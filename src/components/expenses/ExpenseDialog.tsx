@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
+import { useShop } from "@/hooks/useShop";
 import { toast } from "sonner";
 import type { Expense } from "@/pages/ExpensesPage";
 
@@ -20,6 +21,7 @@ interface Props {
 }
 
 export default function ExpenseDialog({ open, onOpenChange, expense, onSaved }: Props) {
+  const { shopId } = useShop();
   const [date, setDate] = useState("");
   const [category, setCategory] = useState<string>("Other");
   const [amount, setAmount] = useState("");
@@ -47,7 +49,7 @@ export default function ExpenseDialog({ open, onOpenChange, expense, onSaved }: 
     if (!date || !amount) { toast.error("Date and amount are required"); return; }
     setSaving(true);
 
-    const payload = {
+    const payload: any = {
       date,
       category: category as Expense["category"],
       amount: Number(amount),
@@ -55,12 +57,16 @@ export default function ExpenseDialog({ open, onOpenChange, expense, onSaved }: 
       description,
     };
 
-    const { error } = expense
-      ? await supabase.from("expenses").update(payload).eq("id", expense.id)
-      : await supabase.from("expenses").insert(payload);
+    if (expense) {
+      const { error } = await supabase.from("expenses").update(payload).eq("id", expense.id);
+      if (error) { toast.error("Save failed"); setSaving(false); return; }
+    } else {
+      payload.shop_id = shopId;
+      const { error } = await supabase.from("expenses").insert(payload);
+      if (error) { toast.error("Save failed"); setSaving(false); return; }
+    }
 
     setSaving(false);
-    if (error) { toast.error("Save failed"); return; }
     toast.success(expense ? "Expense updated" : "Expense added");
     onOpenChange(false);
     onSaved();

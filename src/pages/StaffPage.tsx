@@ -1,26 +1,18 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useShop } from "@/hooks/useShop";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Link2, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 
 interface Staff {
@@ -35,6 +27,14 @@ interface Staff {
   created_at: string;
 }
 
+interface Invitation {
+  id: string;
+  staff_id: string;
+  invite_code: string;
+  status: string;
+  expires_at: string;
+}
+
 const defaultForm = {
   first_name: "",
   last_name: "",
@@ -47,9 +47,13 @@ const defaultForm = {
 
 export default function StaffPage() {
   const qc = useQueryClient();
+  const { shopId } = useShop();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Staff | null>(null);
   const [form, setForm] = useState(defaultForm);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [inviteLink, setInviteLink] = useState("");
+  const [copied, setCopied] = useState(false);
 
   const { data: staff = [], isLoading } = useQuery({
     queryKey: ["staff"],
@@ -63,9 +67,21 @@ export default function StaffPage() {
     },
   });
 
+  const { data: invitations = [] } = useQuery({
+    queryKey: ["invitations"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("invitations")
+        .select("*")
+        .eq("status", "pending");
+      if (error) throw error;
+      return data as Invitation[];
+    },
+  });
+
   const upsert = useMutation({
     mutationFn: async (values: typeof form & { id?: string }) => {
-      const payload = {
+      const payload: any = {
         first_name: values.first_name,
         last_name: values.last_name,
         phone: values.phone,
@@ -78,6 +94,7 @@ export default function StaffPage() {
         const { error } = await supabase.from("staff").update(payload).eq("id", values.id);
         if (error) throw error;
       } else {
+        payload.shop_id = shopId;
         const { error } = await supabase.from("staff").insert(payload);
         if (error) throw error;
       }
@@ -101,6 +118,43 @@ export default function StaffPage() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const generateInvite = async (staffMember: Staff) => {
+    // Check for existing pending invitation
+    const existing = invitations.find((i) => i.staff_id === staffMember.id);
+    if (existing) {
+      const link = `${window.location.origin}/join/${existing.invite_code}`;
+      setInviteLink(link);
+      setInviteDialogOpen(true);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("invitations")
+      .insert({
+        shop_id: shopId,
+        staff_id: staffMember.id,
+      } as any)
+      .select("invite_code")
+      .single();
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    const link = `${window.location.origin}/join/${data.invite_code}`;
+    setInviteLink(link);
+    setInviteDialogOpen(true);
+    qc.invalidateQueries({ queryKey: ["invitations"] });
+  };
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(inviteLink);
+    setCopied(true);
+    toast.success("Link copied!");
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   function openAdd() {
     setEditing(null);
@@ -133,6 +187,8 @@ export default function StaffPage() {
     upsert.mutate({ ...form, id: editing?.id });
   }
 
+  const hasInvite = (staffId: string) => invitations.some((i) => i.staff_id === staffId);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -154,7 +210,7 @@ export default function StaffPage() {
               <TableHead>Phone</TableHead>
               <TableHead>Commission</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="w-[100px]" />
+              <TableHead className="w-[140px]" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -180,15 +236,18 @@ export default function StaffPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
-                      <Button size="icon" variant="ghost" onClick={() => openEdit(s)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
                       <Button
                         size="icon"
                         variant="ghost"
-                        className="text-destructive"
-                        onClick={() => remove.mutate(s.id)}
+                        title="Generate invite link"
+                        onClick={() => generateInvite(s)}
                       >
+                        <Link2 className={`h-4 w-4 ${hasInvite(s.id) ? "text-primary" : ""}`} />
+                      </Button>
+                      <Button size="icon" variant="ghost" onClick={() => openEdit(s)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="text-destructive" onClick={() => remove.mutate(s.id)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -200,6 +259,7 @@ export default function StaffPage() {
         </Table>
       </div>
 
+      {/* Add/Edit Dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
@@ -209,56 +269,31 @@ export default function StaffPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>First Name</Label>
-                <Input
-                  value={form.first_name}
-                  onChange={(e) => setForm({ ...form, first_name: e.target.value })}
-                  required
-                />
+                <Input value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} required />
               </div>
               <div className="space-y-2">
                 <Label>Last Name</Label>
-                <Input
-                  value={form.last_name}
-                  onChange={(e) => setForm({ ...form, last_name: e.target.value })}
-                  required
-                />
+                <Input value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} required />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Phone</Label>
-                <Input
-                  value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                />
+                <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
               </div>
               <div className="space-y-2">
                 <Label>Email</Label>
-                <Input
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                />
+                <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Role</Label>
-                <Input
-                  value={form.role}
-                  onChange={(e) => setForm({ ...form, role: e.target.value })}
-                  placeholder="e.g. Stylist, Colorist, Manager"
-                />
+                <Input value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} placeholder="e.g. Stylist, Colorist" />
               </div>
               <div className="space-y-2">
                 <Label>Commission (%)</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={form.commission_rate}
-                  onChange={(e) => setForm({ ...form, commission_rate: Number(e.target.value) })}
-                />
+                <Input type="number" min={0} max={100} value={form.commission_rate} onChange={(e) => setForm({ ...form, commission_rate: Number(e.target.value) })} />
               </div>
             </div>
             <DialogFooter>
@@ -268,6 +303,27 @@ export default function StaffPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Invite Link Dialog */}
+      <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Invite Link</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Share this link with the employee so they can create their account and join your shop.
+            </p>
+            <div className="flex gap-2">
+              <Input value={inviteLink} readOnly className="rounded-xl text-xs" />
+              <Button variant="outline" size="icon" onClick={copyLink} className="shrink-0">
+                {copied ? <Check className="h-4 w-4 text-primary" /> : <Copy className="h-4 w-4" />}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">This link expires in 7 days.</p>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

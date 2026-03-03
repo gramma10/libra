@@ -16,9 +16,10 @@ interface NewBookingDialogProps {
   services: any[];
   staff: any[];
   onCreated: () => void;
+  shopId: string;
 }
 
-export default function NewBookingDialog({ open, onOpenChange, currentDate, prefillStaffId, prefillTime, services, staff, onCreated }: NewBookingDialogProps) {
+export default function NewBookingDialog({ open, onOpenChange, currentDate, prefillStaffId, prefillTime, services, staff, onCreated, shopId }: NewBookingDialogProps) {
   const [phone, setPhone] = useState("");
   const [clientMatch, setClientMatch] = useState<any | null>(null);
   const [isNewClient, setIsNewClient] = useState(false);
@@ -41,7 +42,6 @@ export default function NewBookingDialog({ open, onOpenChange, currentDate, pref
     setServiceId("");
   }, [open, prefillStaffId, prefillTime]);
 
-  // Normalize phone: strip spaces/dashes, handle Greek prefix
   const normalizePhone = (raw: string) => {
     let p = raw.replace(/[\s\-()]/g, "");
     if (p.startsWith("+30")) p = p.slice(3);
@@ -50,7 +50,6 @@ export default function NewBookingDialog({ open, onOpenChange, currentDate, pref
     return p;
   };
 
-  // Search client by phone with debounce
   useEffect(() => {
     const normalized = normalizePhone(phone);
     if (normalized.length < 3) { setClientMatch(null); setIsNewClient(false); return; }
@@ -85,7 +84,6 @@ export default function NewBookingDialog({ open, onOpenChange, currentDate, pref
     const startDt = new Date(`${currentDate.toISOString().split("T")[0]}T${startTime}:00`);
     const endDt = new Date(startDt.getTime() + (service?.duration || 30) * 60000);
 
-    // Check for overlapping appointments for the same staff member
     if (staffId) {
       const { data: overlapping } = await supabase
         .from("appointments")
@@ -104,9 +102,13 @@ export default function NewBookingDialog({ open, onOpenChange, currentDate, pref
 
     let clientId = clientMatch?.id;
 
-    // Create new client if needed
     if (isNewClient) {
-      const { data, error } = await supabase.from("clients").insert({ first_name: newFirstName, last_name: newLastName, phone_mobile: phone }).select("id").single();
+      const { data, error } = await supabase.from("clients").insert({
+        first_name: newFirstName,
+        last_name: newLastName,
+        phone_mobile: phone,
+        shop_id: shopId,
+      }).select("id").single();
       if (error) { toast.error(error.message); setSaving(false); return; }
       clientId = data.id;
     }
@@ -117,6 +119,7 @@ export default function NewBookingDialog({ open, onOpenChange, currentDate, pref
       staff_id: staffId || null,
       start_time: startDt.toISOString(),
       end_time: endDt.toISOString(),
+      shop_id: shopId,
     });
 
     if (error) toast.error(error.message);
@@ -135,15 +138,9 @@ export default function NewBookingDialog({ open, onOpenChange, currentDate, pref
           <DialogTitle>New Booking</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          {/* Phone lookup */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Client Phone Number</label>
-            <Input
-              placeholder="Enter phone number..."
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="rounded-xl"
-            />
+            <Input placeholder="Enter phone number..." value={phone} onChange={(e) => setPhone(e.target.value)} className="rounded-xl" />
             {searching && <p className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Searching...</p>}
             {clientMatch && (
               <div className="flex items-center gap-2 rounded-xl bg-primary/10 text-primary px-3 py-2 text-sm">

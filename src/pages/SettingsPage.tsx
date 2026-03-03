@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
+import { useShop } from "@/hooks/useShop";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
@@ -35,6 +36,7 @@ const DEFAULT_HOURS: DayHours[] = [
 
 export default function SettingsPage() {
   const { signOut } = useAuth();
+  const { shopId } = useShop();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settingsId, setSettingsId] = useState<string | null>(null);
@@ -108,7 +110,7 @@ export default function SettingsPage() {
       if (error) toast.error(error.message);
       else toast.success("Settings saved successfully");
     } else {
-      const { error } = await supabase.from("business_settings").insert(payload);
+      const { error } = await supabase.from("business_settings").insert({ ...payload, shop_id: shopId! });
       if (error) toast.error(error.message);
       else toast.success("Settings created");
     }

@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { useShop } from "@/hooks/useShop";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import SellProductDialog from "@/components/inventory/SellProductDialog";
@@ -36,6 +37,7 @@ interface Expense {
 
 export default function InventoryPage() {
   const { isAdmin } = useRole();
+  const { shopId } = useShop();
   const [search, setSearch] = useState("");
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [sales, setSales] = useState<ProductSale[]>([]);
@@ -110,7 +112,6 @@ export default function InventoryPage() {
       const { error } = await supabase.from("inventory").update(form).eq("id", editItem.id);
       if (error) { toast.error(error.message); setSaving(false); return; }
 
-      // Auto-expense if stock increased
       if (stockAdded > 0 && form.cost_price > 0) {
         await supabase.from("expenses").insert({
           date: new Date().toISOString().split("T")[0],
@@ -118,12 +119,12 @@ export default function InventoryPage() {
           amount: form.cost_price * stockAdded,
           status: "Paid" as any,
           description: `Restock of ${form.product_name} (${stockAdded} units)`,
+          shop_id: shopId!,
         });
       }
       toast.success("Product updated");
     } else {
-      // Adding new product
-      const { error } = await supabase.from("inventory").insert(form);
+      const { error } = await supabase.from("inventory").insert({ ...form, shop_id: shopId! });
       if (error) { toast.error(error.message); setSaving(false); return; }
 
       if (form.current_stock > 0 && form.cost_price > 0) {
@@ -133,6 +134,7 @@ export default function InventoryPage() {
           amount: form.cost_price * form.current_stock,
           status: "Paid" as any,
           description: `Purchase of ${form.product_name} (${form.current_stock} units)`,
+          shop_id: shopId!,
         });
       }
       toast.success("Product added");
