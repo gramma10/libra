@@ -31,6 +31,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   });
 
   const fetchShop = useCallback(async () => {
+    setState(prev => ({ ...prev, loading: true }));
     if (!user) {
       setState({ shopId: null, shopName: "", shopSlug: "", hasShop: false, loading: false });
       return;
