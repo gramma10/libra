@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Scissors, ChevronRight, Calendar, Clock, Check, Loader2, User, Users, Phone, Mail } from "lucide-react";
@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useBookingTheme } from "@/hooks/useBookingTheme";
 import { DEFAULT_THEME, type ThemeSettings } from "@/components/settings/ThemePresets";
+import { hexToHSL, isLightColor, adjustHex } from "@/lib/color-utils";
 interface DayHours {
   day: string;
   open: string;
@@ -323,6 +324,34 @@ export default function BookingWidget() {
     setPhoneLookupDone(false); setClientFound(false);
   };
 
+  // Derive shadcn-compatible CSS variable overrides from the theme
+  const themeVars = useMemo(() => {
+    const bgLight = isLightColor(theme.background_color);
+    const cardColor = bgLight ? adjustHex(theme.background_color, -0.03) : adjustHex(theme.background_color, 0.08);
+    const mutedColor = bgLight ? adjustHex(theme.background_color, -0.06) : adjustHex(theme.background_color, 0.12);
+    const borderColor = bgLight ? adjustHex(theme.background_color, -0.12) : adjustHex(theme.background_color, 0.18);
+    const mutedFg = bgLight ? adjustHex(theme.text_color, 0.4) : adjustHex(theme.text_color, -0.3);
+    const primaryFg = isLightColor(theme.primary_color) ? "0 0% 10%" : "0 0% 100%";
+
+    return {
+      "--background": hexToHSL(theme.background_color),
+      "--foreground": hexToHSL(theme.text_color),
+      "--primary": hexToHSL(theme.primary_color),
+      "--primary-foreground": primaryFg,
+      "--card": hexToHSL(cardColor),
+      "--card-foreground": hexToHSL(theme.text_color),
+      "--muted": hexToHSL(mutedColor),
+      "--muted-foreground": hexToHSL(mutedFg),
+      "--border": hexToHSL(borderColor),
+      "--input": hexToHSL(borderColor),
+      "--ring": hexToHSL(theme.primary_color),
+      "--accent": hexToHSL(mutedColor),
+      "--accent-foreground": hexToHSL(theme.text_color),
+      "--radius": theme.border_radius,
+      fontFamily: theme.font_family,
+    } as React.CSSProperties;
+  }, [theme]);
+
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
   }
@@ -331,22 +360,16 @@ export default function BookingWidget() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-4"
-      style={{
-        backgroundColor: theme.background_color,
-        color: theme.text_color,
-        fontFamily: theme.font_family,
-        "--bte-primary": theme.primary_color,
-        "--bte-radius": theme.border_radius,
-      } as React.CSSProperties}
+      className="min-h-screen flex items-center justify-center p-4 bg-background text-foreground"
+      style={themeVars}
     >
       <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5 }} className="w-full max-w-lg">
         <div className="text-center mb-8">
           {logoUrl ? (
             <img src={logoUrl} alt="Logo" className="h-14 w-14 mx-auto rounded-2xl object-cover mb-4" />
           ) : (
-            <div className="h-14 w-14 mx-auto rounded-2xl flex items-center justify-center mb-4" style={{ backgroundColor: theme.primary_color }}>
-              <Scissors className="h-6 w-6 text-white" strokeWidth={1.5} />
+            <div className="h-14 w-14 mx-auto rounded-2xl bg-primary flex items-center justify-center mb-4">
+              <Scissors className="h-6 w-6 text-primary-foreground" strokeWidth={1.5} />
             </div>
           )}
           <h1 className="text-2xl font-semibold tracking-tight">{shopName || "Book an Appointment"}</h1>
@@ -354,11 +377,11 @@ export default function BookingWidget() {
 
         <div className="flex items-center justify-center gap-2 mb-8">
           {steps.map((_, i) => (
-            <div key={i} className={cn("h-2 rounded-full transition-all", i <= stepIndex ? "w-8" : "bg-border w-2")} style={i <= stepIndex ? { backgroundColor: theme.primary_color } : {}} />
+            <div key={i} className={cn("h-2 rounded-full transition-all", i <= stepIndex ? "w-8 bg-primary" : "bg-border w-2")} />
           ))}
         </div>
 
-        <div className="rounded-2xl border border-border bg-card shadow-apple-lg overflow-hidden">
+        <div className="rounded-2xl border border-border bg-card shadow-apple-lg overflow-hidden text-card-foreground">
           <AnimatePresence mode="wait">
             {step === "service" && (
               <motion.div key="service" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="p-6 space-y-3">
