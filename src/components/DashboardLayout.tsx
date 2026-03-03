@@ -4,7 +4,6 @@ import {
   CalendarDays,
   Users,
   Package,
-  Megaphone,
   BarChart3,
   Settings,
   PanelLeftClose,
@@ -24,7 +23,7 @@ const navItems = [
   { to: "/staff", icon: UserCog, label: "Employees" },
   { to: "/inventory", icon: Package, label: "Inventory" },
   { to: "/expenses", icon: Receipt, label: "Expenses" },
-  { to: "/marketing", icon: Megaphone, label: "Marketing" },
+  
   { to: "/reports", icon: BarChart3, label: "Reports" },
   { to: "/settings", icon: Settings, label: "Settings" },
 ];
