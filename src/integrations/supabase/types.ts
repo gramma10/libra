@@ -449,6 +449,7 @@ export type Database = {
           name: string
           owner_id: string | null
           slug: string
+          theme_settings: Json | null
         }
         Insert: {
           address?: string | null
@@ -457,6 +458,7 @@ export type Database = {
           name?: string
           owner_id?: string | null
           slug: string
+          theme_settings?: Json | null
         }
         Update: {
           address?: string | null
@@ -465,6 +467,7 @@ export type Database = {
           name?: string
           owner_id?: string | null
           slug?: string
+          theme_settings?: Json | null
         }
         Relationships: []
       }

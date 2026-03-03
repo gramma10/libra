@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-
+import { useBookingTheme } from "@/hooks/useBookingTheme";
+import { DEFAULT_THEME, type ThemeSettings } from "@/components/settings/ThemePresets";
 interface DayHours {
   day: string;
   open: string;
@@ -48,6 +49,8 @@ export default function BookingWidget() {
   const [logoUrl, setLogoUrl] = useState("");
   const [shopName, setShopName] = useState("");
   const [operatingHours, setOperatingHours] = useState<DayHours[]>([]);
+
+  const { theme, loaded: themeLoaded } = useBookingTheme(shopId);
 
   // Generate time slots from operating hours for a given date
   const getTimeSlotsForDate = (date: Date): string[] => {
@@ -327,14 +330,23 @@ export default function BookingWidget() {
   const timeSlots = selectedDate ? getTimeSlotsForDate(selectedDate) : [];
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div
+      className="min-h-screen flex items-center justify-center p-4"
+      style={{
+        backgroundColor: theme.background_color,
+        color: theme.text_color,
+        fontFamily: theme.font_family,
+        "--bte-primary": theme.primary_color,
+        "--bte-radius": theme.border_radius,
+      } as React.CSSProperties}
+    >
       <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5 }} className="w-full max-w-lg">
         <div className="text-center mb-8">
           {logoUrl ? (
             <img src={logoUrl} alt="Logo" className="h-14 w-14 mx-auto rounded-2xl object-cover mb-4" />
           ) : (
-            <div className="h-14 w-14 mx-auto rounded-2xl bg-primary flex items-center justify-center mb-4">
-              <Scissors className="h-6 w-6 text-primary-foreground" strokeWidth={1.5} />
+            <div className="h-14 w-14 mx-auto rounded-2xl flex items-center justify-center mb-4" style={{ backgroundColor: theme.primary_color }}>
+              <Scissors className="h-6 w-6 text-white" strokeWidth={1.5} />
             </div>
           )}
           <h1 className="text-2xl font-semibold tracking-tight">{shopName || "Book an Appointment"}</h1>
@@ -342,7 +354,7 @@ export default function BookingWidget() {
 
         <div className="flex items-center justify-center gap-2 mb-8">
           {steps.map((_, i) => (
-            <div key={i} className={cn("h-2 rounded-full transition-all", i <= stepIndex ? "bg-primary w-8" : "bg-border w-2")} />
+            <div key={i} className={cn("h-2 rounded-full transition-all", i <= stepIndex ? "w-8" : "bg-border w-2")} style={i <= stepIndex ? { backgroundColor: theme.primary_color } : {}} />
           ))}
         </div>
 
