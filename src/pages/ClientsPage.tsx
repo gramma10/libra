@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Search, Plus, Phone, Mail, ChevronRight, Loader2, CalendarDays, DollarSign, UserX, Clock } from "lucide-react";
+import { Plus, Phone, Mail, ChevronRight, Loader2, CalendarDays, DollarSign, UserX, Clock } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -9,10 +9,26 @@ import { useShop } from "@/hooks/useShop";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import ClientFilters from "@/components/clients/ClientFilters";
+
+interface FilterValues {
+  search: string;
+  lastVisit: string;
+  ltvMin: string;
+  ltvMax: string;
+  serviceId: string;
+}
+
+const defaultFilters: FilterValues = {
+  search: "",
+  lastVisit: "all",
+  ltvMin: "",
+  ltvMax: "",
+  serviceId: "all",
+};
 
 export default function ClientsPage() {
   const { shopId } = useShop();
-  const [search, setSearch] = useState("");
   const [clients, setClients] = useState<any[]>([]);
   const [selected, setSelected] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
@@ -21,6 +37,9 @@ export default function ClientsPage() {
   const [form, setForm] = useState({ first_name: "", last_name: "", phone_mobile: "", email: "", tech_notes: "", personal_preferences: "" });
   const [clientAppointments, setClientAppointments] = useState<any[]>([]);
   const [loadingAppts, setLoadingAppts] = useState(false);
+  const [filters, setFilters] = useState<FilterValues>(defaultFilters);
+  const [services, setServices] = useState<{ id: string; service_name: string }[]>([]);
+  const [clientServiceMap, setClientServiceMap] = useState<Record<string, Set<string>>>({});
 
   const fetchClients = async () => {
     setLoading(true);
@@ -30,7 +49,22 @@ export default function ClientsPage() {
     setLoading(false);
   };
 
-  useEffect(() => { fetchClients(); }, []);
+  useEffect(() => {
+    fetchClients();
+    // Fetch services for filter dropdown
+    supabase.from("services").select("id, service_name").then(({ data }) => {
+      setServices(data || []);
+    });
+    // Fetch client-service mapping for service history filter
+    supabase.from("appointments").select("client_id, service_id").not("service_id", "is", null).then(({ data }) => {
+      const map: Record<string, Set<string>> = {};
+      (data || []).forEach((a: any) => {
+        if (!map[a.client_id]) map[a.client_id] = new Set();
+        map[a.client_id].add(a.service_id);
+      });
+      setClientServiceMap(map);
+    });
+  }, []);
 
   // Fetch appointments for selected client
   useEffect(() => {
@@ -48,29 +82,50 @@ export default function ClientsPage() {
     fetchAppts();
   }, [selected?.id]);
 
-  const filtered = clients.filter((c) =>
-    `${c.first_name} ${c.last_name}`.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = useMemo(() => {
+    const now = new Date();
+    return clients.filter((c) => {
+      // Search
+      if (filters.search && !`${c.first_name} ${c.last_name}`.toLowerCase().includes(filters.search.toLowerCase())) return false;
+
+      // Last visit filter
+      if (filters.lastVisit !== "all" && c.last_visit) {
+        const visitDate = new Date(c.last_visit);
+        const daysSince = Math.floor((now.getTime() - visitDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (filters.lastVisit === "30" && daysSince > 30) return false;
+        if (filters.lastVisit === "60" && daysSince > 60) return false;
+        if (filters.lastVisit === "90+" && daysSince < 90) return false;
+      } else if (filters.lastVisit === "30" || filters.lastVisit === "60") {
+        // No last_visit recorded → exclude from "recent" filters
+        if (!c.last_visit) return false;
+      }
+
+      // LTV filter
+      const spent = Number(c.total_spent) || 0;
+      if (filters.ltvMin && spent < Number(filters.ltvMin)) return false;
+      if (filters.ltvMax && spent > Number(filters.ltvMax)) return false;
+
+      // Service history filter
+      if (filters.serviceId !== "all") {
+        const clientServices = clientServiceMap[c.id];
+        if (!clientServices || !clientServices.has(filters.serviceId)) return false;
+      }
+
+      return true;
+    });
+  }, [clients, filters, clientServiceMap]);
 
   const analytics = useMemo(() => {
     if (!clientAppointments.length) return { totalAppts: 0, revenue: 0, lastVisitDays: null as number | null, noShows: 0 };
     const now = new Date();
-
-    // Total appointments: exclude cancelled, include no-shows
     const validAppts = clientAppointments.filter((a) => a.status !== "Cancelled");
     const noShows = validAppts.filter((a) => a.status === "No-Show").length;
-
-    // Revenue: price of completed OR (past end_time AND not no-show/cancelled)
     const revenue = clientAppointments.reduce((sum, a) => {
       if (a.status === "Cancelled" || a.status === "No-Show") return sum;
       const endTime = new Date(a.end_time);
-      if (a.status === "Completed" || endTime < now) {
-        return sum + (a.services?.price || 0);
-      }
+      if (a.status === "Completed" || endTime < now) return sum + (a.services?.price || 0);
       return sum;
     }, 0);
-
-    // Last visit: most recent past appointment that's not cancelled/no-show
     const pastVisits = clientAppointments.filter((a) => {
       if (a.status === "Cancelled" || a.status === "No-Show") return false;
       return new Date(a.end_time) < now;
@@ -80,7 +135,6 @@ export default function ClientsPage() {
       const lastDate = new Date(pastVisits[0].end_time);
       lastVisitDays = Math.floor((now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
     }
-
     return { totalAppts: validAppts.length, revenue, lastVisitDays, noShows };
   }, [clientAppointments]);
 
@@ -101,6 +155,37 @@ export default function ClientsPage() {
     setSaving(false);
   };
 
+  const handleExportCSV = useCallback(() => {
+    if (filtered.length === 0) {
+      toast.error("No clients to export");
+      return;
+    }
+    const escape = (val: string) => {
+      if (!val) return "";
+      if (val.includes(",") || val.includes('"') || val.includes("\n")) {
+        return `"${val.replace(/"/g, '""')}"`;
+      }
+      return val;
+    };
+    const header = "Full Name,Phone,Email,Last Visit,Total Revenue,Preferences/Notes";
+    const rows = filtered.map((c) => {
+      const name = `${c.first_name} ${c.last_name}`;
+      const lastVisit = c.last_visit ? new Date(c.last_visit).toLocaleDateString() : "";
+      const revenue = `€${(Number(c.total_spent) || 0).toFixed(0)}`;
+      const notes = [c.personal_preferences, c.tech_notes].filter(Boolean).join(" | ");
+      return [name, c.phone_mobile, c.email || "", lastVisit, revenue, notes].map(escape).join(",");
+    });
+    const csv = [header, ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `clients_export_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${filtered.length} clients`);
+  }, [filtered]);
+
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="space-y-6">
       <div className="flex items-center justify-between">
@@ -116,10 +201,14 @@ export default function ClientsPage() {
       ) : (
         <div className="flex gap-6 min-h-[calc(100vh-12rem)]">
           <div className="w-80 shrink-0 space-y-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
-              <Input placeholder="Search clients..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 rounded-xl border-border" />
-            </div>
+            <ClientFilters
+              filters={filters}
+              onFilterChange={setFilters}
+              services={services}
+              onExport={handleExportCSV}
+              filteredCount={filtered.length}
+              totalCount={clients.length}
+            />
             <div className="space-y-1">
               {filtered.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No clients found.</p>}
               {filtered.map((client) => (
@@ -155,7 +244,6 @@ export default function ClientsPage() {
                 </div>
               </div>
 
-              {/* Analytics Header */}
               {loadingAppts ? (
                 <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
               ) : (
@@ -216,7 +304,6 @@ export default function ClientsPage() {
                 <p className="text-sm text-muted-foreground">🎂 Birthday: {new Date(selected.birthday).toLocaleDateString()}</p>
               )}
 
-              {/* Recent Appointments Table */}
               {clientAppointments.length > 0 && (
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Recent Appointments</h3>
