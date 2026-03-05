@@ -40,6 +40,8 @@ export default function ClientsPage() {
   const [filters, setFilters] = useState<FilterValues>(defaultFilters);
   const [services, setServices] = useState<{ id: string; service_name: string }[]>([]);
   const [clientServiceMap, setClientServiceMap] = useState<Record<string, Set<string>>>({});
+  const [clientLastVisit, setClientLastVisit] = useState<Record<string, Date>>({});
+  const [clientRevenue, setClientRevenue] = useState<Record<string, number>>({});
 
   const fetchClients = async () => {
     setLoading(true);
@@ -55,15 +57,42 @@ export default function ClientsPage() {
     supabase.from("services").select("id, service_name").then(({ data }) => {
       setServices(data || []);
     });
-    // Fetch client-service mapping for service history filter
-    supabase.from("appointments").select("client_id, service_id").not("service_id", "is", null).then(({ data }) => {
-      const map: Record<string, Set<string>> = {};
-      (data || []).forEach((a: any) => {
-        if (!map[a.client_id]) map[a.client_id] = new Set();
-        map[a.client_id].add(a.service_id);
+    // Fetch appointment data for filters (service history, last visit, revenue)
+    supabase
+      .from("appointments")
+      .select("client_id, service_id, start_time, end_time, status, services(price)")
+      .then(({ data }) => {
+        const serviceMap: Record<string, Set<string>> = {};
+        const lastVisitMap: Record<string, Date> = {};
+        const revenueMap: Record<string, number> = {};
+        const now = new Date();
+
+        (data || []).forEach((a: any) => {
+          // Service history map
+          if (a.service_id) {
+            if (!serviceMap[a.client_id]) serviceMap[a.client_id] = new Set();
+            serviceMap[a.client_id].add(a.service_id);
+          }
+
+          // Skip cancelled/no-show for visit and revenue
+          if (a.status === "Cancelled" || a.status === "No-Show") return;
+
+          const endTime = new Date(a.end_time);
+          if (endTime > now) return; // future appointment
+
+          // Last visit
+          if (!lastVisitMap[a.client_id] || endTime > lastVisitMap[a.client_id]) {
+            lastVisitMap[a.client_id] = endTime;
+          }
+
+          // Revenue
+          revenueMap[a.client_id] = (revenueMap[a.client_id] || 0) + (a.services?.price || 0);
+        });
+
+        setClientServiceMap(serviceMap);
+        setClientLastVisit(lastVisitMap);
+        setClientRevenue(revenueMap);
       });
-      setClientServiceMap(map);
-    });
   }, []);
 
   // Fetch appointments for selected client
