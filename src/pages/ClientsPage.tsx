@@ -40,6 +40,8 @@ export default function ClientsPage() {
   const [filters, setFilters] = useState<FilterValues>(defaultFilters);
   const [services, setServices] = useState<{ id: string; service_name: string }[]>([]);
   const [clientServiceMap, setClientServiceMap] = useState<Record<string, Set<string>>>({});
+  const [clientLastVisit, setClientLastVisit] = useState<Record<string, Date>>({});
+  const [clientRevenue, setClientRevenue] = useState<Record<string, number>>({});
 
   const fetchClients = async () => {
     setLoading(true);
@@ -55,15 +57,42 @@ export default function ClientsPage() {
     supabase.from("services").select("id, service_name").then(({ data }) => {
       setServices(data || []);
     });
-    // Fetch client-service mapping for service history filter
-    supabase.from("appointments").select("client_id, service_id").not("service_id", "is", null).then(({ data }) => {
-      const map: Record<string, Set<string>> = {};
-      (data || []).forEach((a: any) => {
-        if (!map[a.client_id]) map[a.client_id] = new Set();
-        map[a.client_id].add(a.service_id);
+    // Fetch appointment data for filters (service history, last visit, revenue)
+    supabase
+      .from("appointments")
+      .select("client_id, service_id, start_time, end_time, status, services(price)")
+      .then(({ data }) => {
+        const serviceMap: Record<string, Set<string>> = {};
+        const lastVisitMap: Record<string, Date> = {};
+        const revenueMap: Record<string, number> = {};
+        const now = new Date();
+
+        (data || []).forEach((a: any) => {
+          // Service history map
+          if (a.service_id) {
+            if (!serviceMap[a.client_id]) serviceMap[a.client_id] = new Set();
+            serviceMap[a.client_id].add(a.service_id);
+          }
+
+          // Skip cancelled/no-show for visit and revenue
+          if (a.status === "Cancelled" || a.status === "No-Show") return;
+
+          const endTime = new Date(a.end_time);
+          if (endTime > now) return; // future appointment
+
+          // Last visit
+          if (!lastVisitMap[a.client_id] || endTime > lastVisitMap[a.client_id]) {
+            lastVisitMap[a.client_id] = endTime;
+          }
+
+          // Revenue
+          revenueMap[a.client_id] = (revenueMap[a.client_id] || 0) + (a.services?.price || 0);
+        });
+
+        setClientServiceMap(serviceMap);
+        setClientLastVisit(lastVisitMap);
+        setClientRevenue(revenueMap);
       });
-      setClientServiceMap(map);
-    });
   }, []);
 
   // Fetch appointments for selected client
@@ -85,23 +114,31 @@ export default function ClientsPage() {
   const filtered = useMemo(() => {
     const now = new Date();
     return clients.filter((c) => {
-      // Search
-      if (filters.search && !`${c.first_name} ${c.last_name}`.toLowerCase().includes(filters.search.toLowerCase())) return false;
-
-      // Last visit filter
-      if (filters.lastVisit !== "all" && c.last_visit) {
-        const visitDate = new Date(c.last_visit);
-        const daysSince = Math.floor((now.getTime() - visitDate.getTime()) / (1000 * 60 * 60 * 24));
-        if (filters.lastVisit === "30" && daysSince > 30) return false;
-        if (filters.lastVisit === "60" && daysSince > 60) return false;
-        if (filters.lastVisit === "90+" && daysSince < 90) return false;
-      } else if (filters.lastVisit === "30" || filters.lastVisit === "60") {
-        // No last_visit recorded → exclude from "recent" filters
-        if (!c.last_visit) return false;
+      // Search by name, phone, email
+      if (filters.search) {
+        const q = filters.search.toLowerCase();
+        const match = `${c.first_name} ${c.last_name}`.toLowerCase().includes(q)
+          || (c.phone_mobile || "").toLowerCase().includes(q)
+          || (c.email || "").toLowerCase().includes(q);
+        if (!match) return false;
       }
 
-      // LTV filter
-      const spent = Number(c.total_spent) || 0;
+      // Last visit filter (use computed data from appointments)
+      const lastVisitDate = clientLastVisit[c.id];
+      if (filters.lastVisit !== "all") {
+        if (!lastVisitDate) {
+          // No visit recorded - include in "90+" (inactive), exclude from recent filters
+          if (filters.lastVisit !== "90+") return false;
+        } else {
+          const daysSince = Math.floor((now.getTime() - lastVisitDate.getTime()) / (1000 * 60 * 60 * 24));
+          if (filters.lastVisit === "30" && daysSince > 30) return false;
+          if (filters.lastVisit === "60" && daysSince > 60) return false;
+          if (filters.lastVisit === "90+" && daysSince < 90) return false;
+        }
+      }
+
+      // LTV filter (use computed revenue from appointments)
+      const spent = clientRevenue[c.id] || 0;
       if (filters.ltvMin && spent < Number(filters.ltvMin)) return false;
       if (filters.ltvMax && spent > Number(filters.ltvMax)) return false;
 
@@ -113,7 +150,7 @@ export default function ClientsPage() {
 
       return true;
     });
-  }, [clients, filters, clientServiceMap]);
+  }, [clients, filters, clientServiceMap, clientLastVisit, clientRevenue]);
 
   const analytics = useMemo(() => {
     if (!clientAppointments.length) return { totalAppts: 0, revenue: 0, lastVisitDays: null as number | null, noShows: 0 };
