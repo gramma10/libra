@@ -114,23 +114,31 @@ export default function ClientsPage() {
   const filtered = useMemo(() => {
     const now = new Date();
     return clients.filter((c) => {
-      // Search
-      if (filters.search && !`${c.first_name} ${c.last_name}`.toLowerCase().includes(filters.search.toLowerCase())) return false;
-
-      // Last visit filter
-      if (filters.lastVisit !== "all" && c.last_visit) {
-        const visitDate = new Date(c.last_visit);
-        const daysSince = Math.floor((now.getTime() - visitDate.getTime()) / (1000 * 60 * 60 * 24));
-        if (filters.lastVisit === "30" && daysSince > 30) return false;
-        if (filters.lastVisit === "60" && daysSince > 60) return false;
-        if (filters.lastVisit === "90+" && daysSince < 90) return false;
-      } else if (filters.lastVisit === "30" || filters.lastVisit === "60") {
-        // No last_visit recorded → exclude from "recent" filters
-        if (!c.last_visit) return false;
+      // Search by name, phone, email
+      if (filters.search) {
+        const q = filters.search.toLowerCase();
+        const match = `${c.first_name} ${c.last_name}`.toLowerCase().includes(q)
+          || (c.phone_mobile || "").toLowerCase().includes(q)
+          || (c.email || "").toLowerCase().includes(q);
+        if (!match) return false;
       }
 
-      // LTV filter
-      const spent = Number(c.total_spent) || 0;
+      // Last visit filter (use computed data from appointments)
+      const lastVisitDate = clientLastVisit[c.id];
+      if (filters.lastVisit !== "all") {
+        if (!lastVisitDate) {
+          // No visit recorded - include in "90+" (inactive), exclude from recent filters
+          if (filters.lastVisit !== "90+") return false;
+        } else {
+          const daysSince = Math.floor((now.getTime() - lastVisitDate.getTime()) / (1000 * 60 * 60 * 24));
+          if (filters.lastVisit === "30" && daysSince > 30) return false;
+          if (filters.lastVisit === "60" && daysSince > 60) return false;
+          if (filters.lastVisit === "90+" && daysSince < 90) return false;
+        }
+      }
+
+      // LTV filter (use computed revenue from appointments)
+      const spent = clientRevenue[c.id] || 0;
       if (filters.ltvMin && spent < Number(filters.ltvMin)) return false;
       if (filters.ltvMax && spent > Number(filters.ltvMax)) return false;
 
@@ -142,7 +150,7 @@ export default function ClientsPage() {
 
       return true;
     });
-  }, [clients, filters, clientServiceMap]);
+  }, [clients, filters, clientServiceMap, clientLastVisit, clientRevenue]);
 
   const analytics = useMemo(() => {
     if (!clientAppointments.length) return { totalAppts: 0, revenue: 0, lastVisitDays: null as number | null, noShows: 0 };
