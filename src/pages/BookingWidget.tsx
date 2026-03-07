@@ -26,6 +26,14 @@ const MAX_BOOKING_DAYS = 30;
 
 const ANYONE_STAFF = { id: "anyone", first_name: "Anyone", last_name: "", role: "No Preference" };
 
+/** Format a local Date as YYYY-MM-DD using local components (avoids UTC shift from toISOString) */
+const formatLocalDate = (date: Date): string => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
 type Step = "service" | "barber" | "date" | "time" | "info" | "confirm";
 
 export default function BookingWidget() {
