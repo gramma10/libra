@@ -233,6 +233,7 @@ export default function InventoryPage() {
                     </td>
                     {isAdmin && <td className="p-4 text-sm">€{Number(item.cost_price).toFixed(2)}</td>}
                     <td className="p-4 text-sm">€{Number(item.retail_price).toFixed(2)}</td>
+                    <td className="p-4 text-sm font-medium text-muted-foreground">{unitsSold}</td>
                     <td className="p-4 text-sm font-semibold" style={{ color: totalRevenue > 0 ? "hsl(var(--success))" : undefined }}>
                       €{totalRevenue.toFixed(2)}
                     </td>
