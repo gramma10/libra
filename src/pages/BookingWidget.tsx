@@ -265,6 +265,7 @@ export default function BookingWidget() {
     const { data: existing } = await supabase
       .from("clients")
       .select("id")
+      .eq("shop_id", shopId!)
       .or(`phone_mobile.eq.${clientInfo.phone_mobile},phone_mobile.eq.${normalizedPhone}`)
       .limit(1)
       .maybeSingle();
