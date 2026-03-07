@@ -217,8 +217,8 @@ export default function InventoryPage() {
                 <tr><td colSpan={7} className="p-8 text-center text-sm text-muted-foreground">No products found.</td></tr>
               )}
               {filtered.map((item) => {
-                const isLow = item.current_stock <= item.min_stock_level;
-                const totalRevenue = salesByProduct[item.id] || 0;
+                const totalRevenue = salesByProduct.revenue[item.id] || 0;
+                const unitsSold = salesByProduct.units[item.id] || 0;
                 return (
                   <tr key={item.id} className="border-b border-border/50 last:border-b-0 hover:bg-muted/30 transition-colors">
                     <td className="p-4"><p className="text-sm font-medium">{item.product_name}</p></td>
