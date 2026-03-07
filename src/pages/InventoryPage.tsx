@@ -71,11 +71,15 @@ export default function InventoryPage() {
 
   useEffect(() => { fetchItems(); }, []);
 
-  // Total sales revenue per product
+  // Total sales revenue and units sold per product
   const salesByProduct = useMemo(() => {
-    const map: Record<string, number> = {};
-    sales.forEach((s) => { map[s.inventory_id] = (map[s.inventory_id] || 0) + Number(s.total_amount); });
-    return map;
+    const revenueMap: Record<string, number> = {};
+    const unitsMap: Record<string, number> = {};
+    sales.forEach((s) => {
+      revenueMap[s.inventory_id] = (revenueMap[s.inventory_id] || 0) + Number(s.total_amount);
+      unitsMap[s.inventory_id] = (unitsMap[s.inventory_id] || 0) + Number(s.quantity);
+    });
+    return { revenue: revenueMap, units: unitsMap };
   }, [sales]);
 
   const filtered = items.filter((item) =>
