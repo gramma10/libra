@@ -250,7 +250,7 @@ export default function BookingWidget() {
       return;
     }
 
-    const startDt = new Date(`${selectedDate.toISOString().split("T")[0]}T${selectedTime}:00`);
+    const startDt = new Date(`${formatLocalDate(selectedDate)}T${selectedTime}:00`);
     const endDt = new Date(startDt.getTime() + selectedService.duration * 60000);
 
     if (staffIdToUse) {
