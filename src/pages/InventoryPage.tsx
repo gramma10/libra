@@ -207,6 +207,7 @@ export default function InventoryPage() {
                 <th className="text-left p-4 font-medium">Stock</th>
                 {isAdmin && <th className="text-left p-4 font-medium">Cost</th>}
                 <th className="text-left p-4 font-medium">Retail</th>
+                <th className="text-left p-4 font-medium">Units Sold</th>
                 <th className="text-left p-4 font-medium">Total Sales</th>
                 <th className="text-right p-4 font-medium">Actions</th>
               </tr>
