@@ -122,8 +122,9 @@ export default function NewBookingDialog({ open, onOpenChange, currentDate, pref
       shop_id: shopId,
     });
 
-    if (error) toast.error(error.message);
-    else {
+    if (error) {
+      toast.error(error.message);
+    } else {
       toast.success(isNewClient ? "Booking created & new client added!" : "Booking created!");
       onOpenChange(false);
       onCreated();
