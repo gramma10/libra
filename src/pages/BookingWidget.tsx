@@ -212,7 +212,7 @@ export default function BookingWidget() {
 
   const findAvailableStaff = (time: string): any | null => {
     if (!selectedDate || !selectedService) return null;
-    const slotStart = new Date(`${selectedDate.toISOString().split("T")[0]}T${time}:00`);
+    const slotStart = new Date(`${formatLocalDate(selectedDate)}T${time}:00`);
     const slotEnd = new Date(slotStart.getTime() + selectedService.duration * 60000);
     for (const staff of staffList) {
       const staffSlots = bookedSlots.filter((b) => b.staffId === staff.id);
