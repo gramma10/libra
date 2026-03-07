@@ -152,6 +152,15 @@ export default function ClientsPage() {
     });
   }, [clients, filters, clientServiceMap, clientLastVisit, clientRevenue]);
 
+  // Reset selected client when it's no longer in the filtered list
+  useEffect(() => {
+    if (filtered.length === 0) {
+      setSelected(null);
+    } else if (selected && !filtered.find((c) => c.id === selected.id)) {
+      setSelected(filtered[0]);
+    }
+  }, [filtered]);
+
   const analytics = useMemo(() => {
     if (!clientAppointments.length) return { totalAppts: 0, revenue: 0, lastVisitDays: null as number | null, noShows: 0 };
     const now = new Date();
