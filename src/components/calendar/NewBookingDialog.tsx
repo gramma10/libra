@@ -81,7 +81,8 @@ export default function NewBookingDialog({ open, onOpenChange, currentDate, pref
     setSaving(true);
 
     const service = services.find((s: any) => s.id === serviceId);
-    const startDt = new Date(`${currentDate.toISOString().split("T")[0]}T${startTime}:00`);
+    const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}-${String(currentDate.getDate()).padStart(2, "0")}`;
+    const startDt = new Date(`${dateStr}T${startTime}:00`);
     const endDt = new Date(startDt.getTime() + (service?.duration || 30) * 60000);
 
     if (staffId) {
