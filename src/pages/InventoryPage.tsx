@@ -217,6 +217,7 @@ export default function InventoryPage() {
                 <tr><td colSpan={7} className="p-8 text-center text-sm text-muted-foreground">No products found.</td></tr>
               )}
               {filtered.map((item) => {
+                const isLow = item.current_stock <= item.min_stock_level;
                 const totalRevenue = salesByProduct.revenue[item.id] || 0;
                 const unitsSold = salesByProduct.units[item.id] || 0;
                 return (
