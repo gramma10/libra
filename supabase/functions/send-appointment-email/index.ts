@@ -75,20 +75,36 @@ Deno.serve(async (req) => {
     const serviceName = service?.service_name || "Appointment";
     const serviceDuration = service?.duration || 30;
 
+    const localTimeZone = "Europe/Athens";
+
     const startDate = new Date(start_time);
     const endDate = end_time
       ? new Date(end_time)
       : new Date(startDate.getTime() + serviceDuration * 60_000);
 
-    const dateStr = startDate.toLocaleDateString("en-US", {
+    const dateStr = new Intl.DateTimeFormat("en-US", {
+      timeZone: localTimeZone,
       weekday: "long", year: "numeric", month: "long", day: "numeric",
-    });
-    const timeStr = startDate.toLocaleTimeString("en-US", {
-      hour: "2-digit", minute: "2-digit", hour12: true,
-    });
+    }).format(startDate);
 
-    const gcalStart = startDate.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-    const gcalEnd = endDate.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+    const timeStr = new Intl.DateTimeFormat("en-US", {
+      timeZone: localTimeZone,
+      hour: "2-digit", minute: "2-digit", hour12: true,
+    }).format(startDate);
+
+    // Format Google Calendar dates in local timezone
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const toLocalGcal = (d: Date) => {
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: localTimeZone,
+        year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+      }).formatToParts(d);
+      const get = (type: string) => parts.find(p => p.type === type)?.value || "00";
+      return `${get("year")}${get("month")}${get("day")}T${get("hour")}${get("minute")}${get("second")}`;
+    };
+    const gcalStart = toLocalGcal(startDate);
+    const gcalEnd = toLocalGcal(endDate);
     const gcalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(
       `${serviceName} at ${shopName}`
     )}&dates=${gcalStart}/${gcalEnd}&details=${encodeURIComponent(

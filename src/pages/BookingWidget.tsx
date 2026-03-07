@@ -26,6 +26,14 @@ const MAX_BOOKING_DAYS = 30;
 
 const ANYONE_STAFF = { id: "anyone", first_name: "Anyone", last_name: "", role: "No Preference" };
 
+/** Format a local Date as YYYY-MM-DD using local components (avoids UTC shift from toISOString) */
+const formatLocalDate = (date: Date): string => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
 type Step = "service" | "barber" | "date" | "time" | "info" | "confirm";
 
 export default function BookingWidget() {
@@ -190,7 +198,7 @@ export default function BookingWidget() {
 
   const isSlotAvailable = (time: string): boolean => {
     if (!selectedDate || !selectedService) return true;
-    const slotStart = new Date(`${selectedDate.toISOString().split("T")[0]}T${time}:00`);
+    const slotStart = new Date(`${formatLocalDate(selectedDate)}T${time}:00`);
     const slotEnd = new Date(slotStart.getTime() + selectedService.duration * 60000);
 
     if (selectedStaff?.id === "anyone") {
@@ -204,7 +212,7 @@ export default function BookingWidget() {
 
   const findAvailableStaff = (time: string): any | null => {
     if (!selectedDate || !selectedService) return null;
-    const slotStart = new Date(`${selectedDate.toISOString().split("T")[0]}T${time}:00`);
+    const slotStart = new Date(`${formatLocalDate(selectedDate)}T${time}:00`);
     const slotEnd = new Date(slotStart.getTime() + selectedService.duration * 60000);
     for (const staff of staffList) {
       const staffSlots = bookedSlots.filter((b) => b.staffId === staff.id);
@@ -242,7 +250,7 @@ export default function BookingWidget() {
       return;
     }
 
-    const startDt = new Date(`${selectedDate.toISOString().split("T")[0]}T${selectedTime}:00`);
+    const startDt = new Date(`${formatLocalDate(selectedDate)}T${selectedTime}:00`);
     const endDt = new Date(startDt.getTime() + selectedService.duration * 60000);
 
     if (staffIdToUse) {
