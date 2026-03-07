@@ -71,11 +71,15 @@ export default function InventoryPage() {
 
   useEffect(() => { fetchItems(); }, []);
 
-  // Total sales revenue per product
+  // Total sales revenue and units sold per product
   const salesByProduct = useMemo(() => {
-    const map: Record<string, number> = {};
-    sales.forEach((s) => { map[s.inventory_id] = (map[s.inventory_id] || 0) + Number(s.total_amount); });
-    return map;
+    const revenueMap: Record<string, number> = {};
+    const unitsMap: Record<string, number> = {};
+    sales.forEach((s) => {
+      revenueMap[s.inventory_id] = (revenueMap[s.inventory_id] || 0) + Number(s.total_amount);
+      unitsMap[s.inventory_id] = (unitsMap[s.inventory_id] || 0) + Number(s.quantity);
+    });
+    return { revenue: revenueMap, units: unitsMap };
   }, [sales]);
 
   const filtered = items.filter((item) =>
@@ -203,6 +207,7 @@ export default function InventoryPage() {
                 <th className="text-left p-4 font-medium">Stock</th>
                 {isAdmin && <th className="text-left p-4 font-medium">Cost</th>}
                 <th className="text-left p-4 font-medium">Retail</th>
+                <th className="text-left p-4 font-medium">Units Sold</th>
                 <th className="text-left p-4 font-medium">Total Sales</th>
                 <th className="text-right p-4 font-medium">Actions</th>
               </tr>
@@ -213,7 +218,8 @@ export default function InventoryPage() {
               )}
               {filtered.map((item) => {
                 const isLow = item.current_stock <= item.min_stock_level;
-                const totalRevenue = salesByProduct[item.id] || 0;
+                const totalRevenue = salesByProduct.revenue[item.id] || 0;
+                const unitsSold = salesByProduct.units[item.id] || 0;
                 return (
                   <tr key={item.id} className="border-b border-border/50 last:border-b-0 hover:bg-muted/30 transition-colors">
                     <td className="p-4"><p className="text-sm font-medium">{item.product_name}</p></td>
@@ -227,6 +233,7 @@ export default function InventoryPage() {
                     </td>
                     {isAdmin && <td className="p-4 text-sm">€{Number(item.cost_price).toFixed(2)}</td>}
                     <td className="p-4 text-sm">€{Number(item.retail_price).toFixed(2)}</td>
+                    <td className="p-4 text-sm font-medium text-muted-foreground">{unitsSold}</td>
                     <td className="p-4 text-sm font-semibold" style={{ color: totalRevenue > 0 ? "hsl(var(--success))" : undefined }}>
                       €{totalRevenue.toFixed(2)}
                     </td>
