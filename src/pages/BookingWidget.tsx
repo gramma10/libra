@@ -137,12 +137,13 @@ export default function BookingWidget() {
 
   useEffect(() => {
     const normalized = normalizePhone(clientInfo.phone_mobile);
-    if (normalized.length < 5) { setPhoneLookupDone(false); setClientFound(false); return; }
+    if (normalized.length < 5 || !shopId) { setPhoneLookupDone(false); setClientFound(false); return; }
     const timer = setTimeout(async () => {
       setLookingUpPhone(true);
       const { data } = await supabase
         .from("clients")
         .select("id, first_name, last_name, email, phone_mobile")
+        .eq("shop_id", shopId)
         .or(`phone_mobile.eq.${clientInfo.phone_mobile},phone_mobile.eq.${normalized}`)
         .limit(1)
         .maybeSingle();
@@ -161,7 +162,7 @@ export default function BookingWidget() {
       setLookingUpPhone(false);
     }, 500);
     return () => clearTimeout(timer);
-  }, [clientInfo.phone_mobile]);
+  }, [clientInfo.phone_mobile, shopId]);
 
   useEffect(() => {
     if (!selectedDate || !selectedStaff) return;
@@ -265,6 +266,7 @@ export default function BookingWidget() {
     const { data: existing } = await supabase
       .from("clients")
       .select("id")
+      .eq("shop_id", shopId!)
       .or(`phone_mobile.eq.${clientInfo.phone_mobile},phone_mobile.eq.${normalizedPhone}`)
       .limit(1)
       .maybeSingle();
