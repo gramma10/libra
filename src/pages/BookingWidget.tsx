@@ -292,19 +292,33 @@ export default function BookingWidget() {
       clientId = newClient.id;
     }
 
-    const { error } = await supabase.from("appointments").insert({
+    const { data: newAppointment, error } = await supabase.from("appointments").insert({
       client_id: clientId,
       service_id: selectedService.id,
       staff_id: staffIdToUse || null,
       start_time: startDt.toISOString(),
       end_time: endDt.toISOString(),
       shop_id: shopId!,
-    });
+    }).select("*").single();
 
-    if (error) toast.error(error.message);
-    else {
+    if (error) {
+      toast.error(error.message);
+    } else {
       toast.success("Booking confirmed!");
       setStep("confirm");
+
+      // Fire-and-forget email confirmation
+      if (newAppointment) {
+        supabase.functions
+          .invoke("send-appointment-email", {
+            body: { record: newAppointment },
+          })
+          .then(({ error: invokeError }) => {
+            if (invokeError) {
+              console.error("Email invocation failed:", invokeError);
+            }
+          });
+      }
     }
     setSubmitting(false);
   };
