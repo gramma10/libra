@@ -113,23 +113,50 @@ export default function NewBookingDialog({ open, onOpenChange, currentDate, pref
       clientId = data.id;
     }
 
-    const { error } = await supabase.from("appointments").insert({
-      client_id: clientId,
-      service_id: serviceId,
-      staff_id: staffId || null,
-      start_time: startDt.toISOString(),
-      end_time: endDt.toISOString(),
-      shop_id: shopId,
-    });
+    try {
+      const { data: newAppointment, error: insertError } = await supabase
+        .from("appointments")
+        .insert({
+          client_id: clientId,
+          service_id: serviceId,
+          staff_id: staffId || null,
+          start_time: startDt.toISOString(),
+          end_time: endDt.toISOString(),
+          shop_id: shopId,
+        })
+        .select("*")
+        .single();
 
-    if (error) {
-      toast.error(error.message);
-    } else {
+      if (insertError) {
+        toast.error(insertError.message);
+        setSaving(false);
+        return;
+      }
+
+      // Booking succeeded — now try sending confirmation email (non-blocking)
       toast.success(isNewClient ? "Booking created & new client added!" : "Booking created!");
       onOpenChange(false);
       onCreated();
+
+      // Fire-and-forget email invocation
+      if (newAppointment) {
+        supabase.functions
+          .invoke("send-appointment-email", {
+            body: { record: newAppointment },
+          })
+          .then(({ error: invokeError }) => {
+            if (invokeError) {
+              console.error("Email invocation failed:", invokeError);
+              toast.warning("Booking saved, but confirmation email failed to send.");
+            }
+          });
+      }
+    } catch (err) {
+      console.error("Unexpected error:", err);
+      toast.error("An unexpected error occurred.");
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   return (
