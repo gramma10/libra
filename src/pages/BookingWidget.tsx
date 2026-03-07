@@ -198,7 +198,7 @@ export default function BookingWidget() {
 
   const isSlotAvailable = (time: string): boolean => {
     if (!selectedDate || !selectedService) return true;
-    const slotStart = new Date(`${selectedDate.toISOString().split("T")[0]}T${time}:00`);
+    const slotStart = new Date(`${formatLocalDate(selectedDate)}T${time}:00`);
     const slotEnd = new Date(slotStart.getTime() + selectedService.duration * 60000);
 
     if (selectedStaff?.id === "anyone") {
