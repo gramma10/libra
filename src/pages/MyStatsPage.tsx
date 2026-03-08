@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Loader2, DollarSign, Wallet, CalendarCheck } from "lucide-react";
+import { Loader2, DollarSign, Wallet, CalendarCheck, ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useRole } from "@/hooks/useRole";
 import StatCard from "@/components/reports/StatCard";
+import { Button } from "@/components/ui/button";
 
 interface Appointment {
   id: string;
@@ -25,10 +26,11 @@ export default function MyStatsPage() {
   const [loading, setLoading] = useState(true);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [staffInfo, setStaffInfo] = useState<StaffInfo | null>(null);
+  const [viewDate, setViewDate] = useState(() => new Date());
 
-  const now = useMemo(() => new Date(), []);
-  const monthStart = useMemo(() => new Date(now.getFullYear(), now.getMonth(), 1).toISOString(), [now]);
-  const monthEnd = useMemo(() => new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).toISOString(), [now]);
+  const monthStart = useMemo(() => new Date(viewDate.getFullYear(), viewDate.getMonth(), 1).toISOString(), [viewDate]);
+  const monthEnd = useMemo(() => new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0, 23, 59, 59, 999).toISOString(), [viewDate]);
+  const monthLabel = viewDate.toLocaleString("default", { month: "long", year: "numeric" });
 
   useEffect(() => {
     if (!staffRecordId) return;
@@ -81,13 +83,21 @@ export default function MyStatsPage() {
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          My Stats {staffInfo && `— ${staffInfo.first_name} ${staffInfo.last_name}`}
-        </h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          {now.toLocaleString("default", { month: "long", year: "numeric" })}
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            My Stats {staffInfo && `— ${staffInfo.first_name} ${staffInfo.last_name}`}
+          </h1>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" className="rounded-xl" onClick={() => setViewDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-sm font-semibold min-w-[140px] text-center">{monthLabel}</span>
+          <Button variant="ghost" size="icon" className="rounded-xl" onClick={() => setViewDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1))}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
