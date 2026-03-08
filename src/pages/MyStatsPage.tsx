@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Loader2, DollarSign, Wallet, CalendarCheck } from "lucide-react";
+import { Loader2, DollarSign, Wallet, CalendarCheck, ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useRole } from "@/hooks/useRole";
 import StatCard from "@/components/reports/StatCard";
+import { Button } from "@/components/ui/button";
 
 interface Appointment {
   id: string;
@@ -25,10 +26,11 @@ export default function MyStatsPage() {
   const [loading, setLoading] = useState(true);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [staffInfo, setStaffInfo] = useState<StaffInfo | null>(null);
+  const [viewDate, setViewDate] = useState(() => new Date());
 
-  const now = useMemo(() => new Date(), []);
-  const monthStart = useMemo(() => new Date(now.getFullYear(), now.getMonth(), 1).toISOString(), [now]);
-  const monthEnd = useMemo(() => new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).toISOString(), [now]);
+  const monthStart = useMemo(() => new Date(viewDate.getFullYear(), viewDate.getMonth(), 1).toISOString(), [viewDate]);
+  const monthEnd = useMemo(() => new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0, 23, 59, 59, 999).toISOString(), [viewDate]);
+  const monthLabel = viewDate.toLocaleString("default", { month: "long", year: "numeric" });
 
   useEffect(() => {
     if (!staffRecordId) return;
