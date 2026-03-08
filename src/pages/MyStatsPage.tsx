@@ -83,13 +83,21 @@ export default function MyStatsPage() {
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          My Stats {staffInfo && `— ${staffInfo.first_name} ${staffInfo.last_name}`}
-        </h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          {now.toLocaleString("default", { month: "long", year: "numeric" })}
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            My Stats {staffInfo && `— ${staffInfo.first_name} ${staffInfo.last_name}`}
+          </h1>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" className="rounded-xl" onClick={() => setViewDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-sm font-semibold min-w-[140px] text-center">{monthLabel}</span>
+          <Button variant="ghost" size="icon" className="rounded-xl" onClick={() => setViewDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1))}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
