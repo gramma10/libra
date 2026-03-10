@@ -127,7 +127,7 @@ Deno.serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: `${shopName} <onboarding@resend.dev>`,
+        from: `${shopName} <noreply@auragram.gr>`,
         to: [client.email],
         subject: `Appointment Confirmed: ${shopName}`,
         html,
