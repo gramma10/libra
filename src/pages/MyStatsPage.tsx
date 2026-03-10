@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Loader2, DollarSign, Wallet, CalendarCheck, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, DollarSign, Wallet, CalendarCheck, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useRole } from "@/hooks/useRole";
 import StatCard from "@/components/reports/StatCard";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 interface Appointment {
   id: string;
@@ -21,6 +22,14 @@ interface StaffInfo {
   last_name: string;
 }
 
+const statusColors: Record<string, string> = {
+  Completed: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+  Confirmed: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+  Pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
+  Cancelled: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+  "No-Show": "bg-muted text-muted-foreground",
+};
+
 export default function MyStatsPage() {
   const { staffRecordId } = useRole();
   const [loading, setLoading] = useState(true);
@@ -35,7 +44,7 @@ export default function MyStatsPage() {
   useEffect(() => {
     if (!staffRecordId) return;
 
-    const fetch = async () => {
+    const fetchData = async () => {
       setLoading(true);
       const [apptRes, staffRes] = await Promise.all([
         supabase
@@ -55,18 +64,20 @@ export default function MyStatsPage() {
       setStaffInfo(staffRes.data as StaffInfo | null);
       setLoading(false);
     };
-    fetch();
+    fetchData();
   }, [staffRecordId, monthStart, monthEnd]);
 
   const completed = appointments.filter((a) => a.status === "Completed");
   const totalRevenue = completed.reduce((s, a) => s + Number(a.services?.price || 0), 0);
   const commissionRate = Number(staffInfo?.commission_rate || 0);
   const myCommissions = totalRevenue * commissionRate / 100;
+  const totalAppointments = appointments.filter((a) => a.status !== "Cancelled").length;
 
   const stats = [
-    { label: "My Revenue This Month", value: `€${totalRevenue.toFixed(0)}`, icon: DollarSign, color: "hsl(var(--success))" },
-    { label: `My Commissions (${commissionRate}%)`, value: `€${myCommissions.toFixed(0)}`, icon: Wallet, color: "hsl(var(--primary))" },
-    { label: "Completed Appointments", value: String(completed.length), icon: CalendarCheck, color: "hsl(var(--accent-foreground))" },
+    { label: "Revenue (Completed)", value: `€${totalRevenue.toFixed(0)}`, icon: DollarSign, color: "hsl(var(--success))" },
+    { label: `Commissions (${commissionRate}%)`, value: `€${myCommissions.toFixed(0)}`, icon: Wallet, color: "hsl(var(--primary))" },
+    { label: "Completed", value: String(completed.length), icon: CalendarCheck, color: "hsl(var(--accent-foreground))" },
+    { label: "Total Appointments", value: String(totalAppointments), icon: Calendar, color: "hsl(var(--secondary-foreground))" },
   ];
 
   if (loading) {
@@ -100,49 +111,50 @@ export default function MyStatsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {stats.map((stat, i) => (
           <StatCard key={stat.label} stat={stat} index={i} />
         ))}
       </div>
 
-      {/* Revenue by service */}
-      <div className="rounded-2xl border border-border bg-card p-5 shadow-apple">
-        <h3 className="text-sm font-semibold mb-3">Revenue by Service</h3>
-        <div className="space-y-2">
-          {Object.entries(
-            completed.reduce<Record<string, { count: number; total: number }>>((acc, a) => {
-              const name = a.services?.service_name || "Unknown";
-              if (!acc[name]) acc[name] = { count: 0, total: 0 };
-              acc[name].count++;
-              acc[name].total += Number(a.services?.price || 0);
-              return acc;
-            }, {})
-          ).map(([name, { count, total }]) => (
-            <div key={name} className="flex items-center justify-between py-1.5 border-b border-border/50 last:border-0">
-              <div>
-                <span className="text-sm font-medium">{name}</span>
-                <span className="text-xs text-muted-foreground ml-2">× {count}</span>
+      {/* Revenue by service (completed only) */}
+      {completed.length > 0 && (
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-apple">
+          <h3 className="text-sm font-semibold mb-3">Revenue by Service</h3>
+          <div className="space-y-2">
+            {Object.entries(
+              completed.reduce<Record<string, { count: number; total: number }>>((acc, a) => {
+                const name = a.services?.service_name || "Unknown";
+                if (!acc[name]) acc[name] = { count: 0, total: 0 };
+                acc[name].count++;
+                acc[name].total += Number(a.services?.price || 0);
+                return acc;
+              }, {})
+            ).map(([name, { count, total }]) => (
+              <div key={name} className="flex items-center justify-between py-1.5 border-b border-border/50 last:border-0">
+                <div>
+                  <span className="text-sm font-medium">{name}</span>
+                  <span className="text-xs text-muted-foreground ml-2">× {count}</span>
+                </div>
+                <span className="text-sm font-semibold" style={{ color: "hsl(var(--success))" }}>€{total.toFixed(2)}</span>
               </div>
-              <span className="text-sm font-semibold" style={{ color: "hsl(var(--success))" }}>€{total.toFixed(2)}</span>
-            </div>
-          ))}
-          {completed.length === 0 && <p className="text-sm text-muted-foreground">No completed appointments this month.</p>}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Completed Appointments List */}
+      {/* All Appointments List */}
       <div className="rounded-2xl border border-border bg-card shadow-apple overflow-hidden">
         <div className="p-4 border-b border-border">
-          <h3 className="text-sm font-semibold">Completed Appointments</h3>
+          <h3 className="text-sm font-semibold">All Appointments</h3>
         </div>
         <div className="divide-y divide-border/50">
-          {completed.length === 0 && (
-            <p className="p-4 text-sm text-muted-foreground text-center">No completed appointments.</p>
+          {appointments.length === 0 && (
+            <p className="p-4 text-sm text-muted-foreground text-center">No appointments this month.</p>
           )}
-          {completed.map((a) => (
+          {appointments.map((a) => (
             <div key={a.id} className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors">
-              <div>
+              <div className="space-y-0.5">
                 <p className="text-sm font-medium">
                   {a.clients?.first_name} {a.clients?.last_name}
                 </p>
@@ -150,7 +162,12 @@ export default function MyStatsPage() {
                   {a.services?.service_name} · {new Date(a.start_time).toLocaleDateString()} {new Date(a.start_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                 </p>
               </div>
-              <span className="text-sm font-semibold">€{Number(a.services?.price || 0).toFixed(2)}</span>
+              <div className="flex items-center gap-3">
+                <Badge variant="outline" className={statusColors[a.status] || ""}>
+                  {a.status}
+                </Badge>
+                <span className="text-sm font-semibold">€{Number(a.services?.price || 0).toFixed(2)}</span>
+              </div>
             </div>
           ))}
         </div>
