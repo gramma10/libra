@@ -140,17 +140,22 @@ export default function NewBookingDialog({ open, onOpenChange, currentDate, pref
       onCreated();
 
       // Fire-and-forget email invocation
+      console.log("newAppointment for email:", newAppointment);
       if (newAppointment) {
+        console.log("Invoking send-appointment-email...");
         supabase.functions
           .invoke("send-appointment-email", {
             body: { record: newAppointment },
           })
-          .then(({ error: invokeError }) => {
+          .then(({ data, error: invokeError }) => {
+            console.log("Email invoke result:", { data, error: invokeError });
             if (invokeError) {
               console.error("Email invocation failed:", invokeError);
               toast.warning("Booking saved, but confirmation email failed to send.");
             }
           });
+      } else {
+        console.warn("No newAppointment data returned, email skipped");
       }
     } catch (err) {
       console.error("Unexpected error:", err);
