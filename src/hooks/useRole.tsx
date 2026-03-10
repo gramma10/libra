@@ -40,17 +40,13 @@ export function useRole(): RoleState {
       const userRole = (memberData?.role as AppRole) || null;
       setRole(userRole);
 
-      // If staff, find linked staff record
-      if (userRole === "staff") {
-        const { data: staffData } = await supabase
-          .from("staff")
-          .select("id")
-          .eq("user_id", user.id)
-          .maybeSingle();
-        setStaffRecordId(staffData?.id || null);
-      } else {
-        setStaffRecordId(null);
-      }
+      // Always check for linked staff record (admins/managers may also have one)
+      const { data: staffData } = await supabase
+        .from("staff")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      setStaffRecordId(staffData?.id || null);
 
       setLoading(false);
     };
