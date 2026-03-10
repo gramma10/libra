@@ -593,6 +593,7 @@ export type Database = {
     }
     Functions: {
       accept_invitation: { Args: { _invite_code: string }; Returns: Json }
+      auto_complete_past_appointments: { Args: never; Returns: undefined }
       create_shop: { Args: { _name: string; _slug: string }; Returns: string }
       get_user_role: { Args: { _user_id: string }; Returns: string }
       get_user_shop_id: { Args: { _user_id: string }; Returns: string }
