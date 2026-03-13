@@ -114,6 +114,16 @@ export const el: Record<TranslationKey, string> = {
   "clients.phone": "Τηλέφωνο",
   "clients.emailLabel": "Email",
   "clients.techNotesLabel": "Τεχνικές Σημειώσεις",
+  "clients.editClient": "Επεξεργασία Πελάτη",
+  "clients.deleteClient": "Διαγραφή Πελάτη",
+  "clients.deleteConfirm": "Είστε σίγουροι ότι θέλετε να διαγράψετε αυτόν τον πελάτη; Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.",
+  "clients.deleted": "Ο πελάτης διαγράφηκε",
+  "clients.updated": "Ο πελάτης ενημερώθηκε",
+  "clients.save": "Αποθήκευση",
+  "clients.cancel": "Ακύρωση",
+  "clients.delete": "Διαγραφή",
+  "clients.firstName": "Όνομα",
+  "clients.lastName": "Επώνυμο",
 
   // Services
   "services.title": "Υπηρεσίες",
