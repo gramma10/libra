@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface NewBookingDialogProps {
   open: boolean;
@@ -20,6 +21,7 @@ interface NewBookingDialogProps {
 }
 
 export default function NewBookingDialog({ open, onOpenChange, currentDate, prefillStaffId, prefillTime, services, staff, onCreated, shopId }: NewBookingDialogProps) {
+  const { t } = useLanguage();
   const [phone, setPhone] = useState("");
   const [clientMatch, setClientMatch] = useState<any | null>(null);
   const [isNewClient, setIsNewClient] = useState(false);
@@ -74,9 +76,9 @@ export default function NewBookingDialog({ open, onOpenChange, currentDate, pref
   }, [phone]);
 
   const handleSubmit = async () => {
-    if (!phone || phone.length < 3) { toast.error("Enter a phone number"); return; }
-    if (!serviceId || !startTime) { toast.error("Fill all required fields"); return; }
-    if (isNewClient && (!newFirstName || !newLastName)) { toast.error("Enter the client's name"); return; }
+    if (!phone || phone.length < 3) { toast.error(t("booking.enterPhone")); return; }
+    if (!serviceId || !startTime) { toast.error(t("booking.fillRequired")); return; }
+    if (isNewClient && (!newFirstName || !newLastName)) { toast.error(t("booking.enterClientName")); return; }
 
     setSaving(true);
 
@@ -95,7 +97,7 @@ export default function NewBookingDialog({ open, onOpenChange, currentDate, pref
         .limit(1);
 
       if (overlapping && overlapping.length > 0) {
-        toast.error("This time slot overlaps with an existing appointment for this employee.");
+        toast.error(t("booking.overlap"));
         setSaving(false);
         return;
       }
@@ -134,28 +136,22 @@ export default function NewBookingDialog({ open, onOpenChange, currentDate, pref
         return;
       }
 
-      // Booking succeeded — now try sending confirmation email (non-blocking)
-      toast.success(isNewClient ? "Booking created & new client added!" : "Booking created!");
+      toast.success(isNewClient ? t("booking.createdNewClient") : t("booking.created"));
       onOpenChange(false);
       onCreated();
 
       // Fire-and-forget email invocation
-      console.log("newAppointment for email:", newAppointment);
       if (newAppointment) {
-        console.log("Invoking send-appointment-email...");
         supabase.functions
           .invoke("send-appointment-email", {
             body: { record: newAppointment },
           })
           .then(({ data, error: invokeError }) => {
-            console.log("Email invoke result:", { data, error: invokeError });
             if (invokeError) {
               console.error("Email invocation failed:", invokeError);
-              toast.warning("Booking saved, but confirmation email failed to send.");
+              toast.warning(t("booking.emailFailed"));
             }
           });
-      } else {
-        console.warn("No newAppointment data returned, email skipped");
       }
     } catch (err) {
       console.error("Unexpected error:", err);
@@ -169,38 +165,38 @@ export default function NewBookingDialog({ open, onOpenChange, currentDate, pref
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="rounded-2xl">
         <DialogHeader>
-          <DialogTitle>New Booking</DialogTitle>
+          <DialogTitle>{t("booking.newBooking")}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium">Client Phone Number</label>
-            <Input placeholder="Enter phone number..." value={phone} onChange={(e) => setPhone(e.target.value)} className="rounded-xl" />
-            {searching && <p className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Searching...</p>}
+            <label className="text-sm font-medium">{t("booking.clientPhone")}</label>
+            <Input placeholder={t("booking.phonePlaceholder")} value={phone} onChange={(e) => setPhone(e.target.value)} className="rounded-xl" />
+            {searching && <p className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> {t("booking.searching")}</p>}
             {clientMatch && (
               <div className="flex items-center gap-2 rounded-xl bg-primary/10 text-primary px-3 py-2 text-sm">
                 <UserCheck className="h-4 w-4" />
                 <span className="font-medium">{clientMatch.first_name} {clientMatch.last_name}</span>
-                <span className="text-xs text-muted-foreground">— existing client</span>
+                <span className="text-xs text-muted-foreground">{t("booking.existingClient")}</span>
               </div>
             )}
             {isNewClient && (
               <div className="space-y-2">
                 <div className="flex items-center gap-2 rounded-xl bg-accent text-accent-foreground px-3 py-2 text-sm">
                   <UserPlus className="h-4 w-4" />
-                  <span className="font-medium">New client — enter their details</span>
+                  <span className="font-medium">{t("booking.newClientDetails")}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  <Input placeholder="First name" value={newFirstName} onChange={(e) => setNewFirstName(e.target.value)} className="rounded-xl" />
-                  <Input placeholder="Last name" value={newLastName} onChange={(e) => setNewLastName(e.target.value)} className="rounded-xl" />
+                  <Input placeholder={t("booking.firstName")} value={newFirstName} onChange={(e) => setNewFirstName(e.target.value)} className="rounded-xl" />
+                  <Input placeholder={t("booking.lastName")} value={newLastName} onChange={(e) => setNewLastName(e.target.value)} className="rounded-xl" />
                 </div>
               </div>
             )}
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Service</label>
+            <label className="text-sm font-medium">{t("booking.service")}</label>
             <Select value={serviceId} onValueChange={setServiceId}>
-              <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select service" /></SelectTrigger>
+              <SelectTrigger className="rounded-xl"><SelectValue placeholder={t("booking.selectService")} /></SelectTrigger>
               <SelectContent>
                 {services.map((s: any) => (
                   <SelectItem key={s.id} value={s.id}>{s.service_name} ({s.duration} min — €{s.price})</SelectItem>
@@ -210,9 +206,9 @@ export default function NewBookingDialog({ open, onOpenChange, currentDate, pref
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Employee</label>
+            <label className="text-sm font-medium">{t("booking.employee")}</label>
             <Select value={staffId} onValueChange={setStaffId}>
-              <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select employee" /></SelectTrigger>
+              <SelectTrigger className="rounded-xl"><SelectValue placeholder={t("booking.selectEmployee")} /></SelectTrigger>
               <SelectContent>
                 {staff.map((s: any) => (
                   <SelectItem key={s.id} value={s.id}>{s.first_name} {s.last_name}</SelectItem>
@@ -222,13 +218,13 @@ export default function NewBookingDialog({ open, onOpenChange, currentDate, pref
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Time</label>
+            <label className="text-sm font-medium">{t("booking.time")}</label>
             <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="rounded-xl" />
           </div>
 
           <Button className="w-full rounded-xl" onClick={handleSubmit} disabled={saving}>
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-            Create Booking
+            {t("booking.createBooking")}
           </Button>
         </div>
       </DialogContent>

@@ -1,39 +1,60 @@
 
 
-## Add English / Greek Language Toggle
+## Root Cause Analysis
 
-### Approach
-Create a lightweight i18n system using React Context — no external library needed. A `LanguageProvider` will hold the current locale (`en` | `el`) and provide a `t()` translation function. A toggle button in the sidebar and on the auth page will switch between languages.
+The bug is a **race condition** between the invite acceptance and the shop-loading state. Here's what happens:
 
-### What will be built
+1. New employee signs up, lands on `/` via ProtectedRoute
+2. ProtectedRoute's useEffect correctly finds the `pending_invite_code` and calls `accept_invitation` RPC -- **this succeeds**
+3. After success, it calls `refetch()` to refresh the shop context, then **immediately** sets `acceptingInvite = false` in the `finally` block
+4. But `refetch()` is async and `fetchShop` in `useShop` **never sets `loading: true`** when called as a refetch (only the initial state is `loading: true`)
+5. So the component re-renders with: `acceptingInvite=false`, `shopLoading=false`, `hasShop=false` (refetch hasn't completed yet)
+6. This hits the `if (!hasShop) return <Navigate to="/onboarding" />` redirect before the refetch resolves
 
-1. **Translation files** — `src/i18n/en.ts` and `src/i18n/el.ts` containing all UI strings organized by section (sidebar, calendar, clients, services, staff, settings, auth, booking widget, etc.)
+## Plan
 
-2. **Language context** — `src/hooks/useLanguage.tsx` with:
-   - `LanguageProvider` wrapping the app
-   - `useLanguage()` hook returning `{ language, setLanguage, t }`
-   - Persists selection to `localStorage`
+### 1. Fix `useShop.tsx` -- set loading on refetch
 
-3. **Language toggle button** — A small flag/globe button:
-   - In **DashboardLayout sidebar** (bottom section, near sign-out)
-   - On **AuthPage** (top-right corner)
-   - Clicking toggles between EN ↔ EL
+Update `fetchShop` to set `loading: true` at the start of every call (not just the initial state). This ensures the ProtectedRoute spinner stays active while the shop data is being re-fetched.
 
-4. **Replace hardcoded strings** across all pages and components:
-   - Sidebar labels (Calendar, Clients, Services, Employees, etc.)
-   - Page titles and descriptions
-   - Button labels (Save, Cancel, New Booking, Sign In, etc.)
-   - Form labels and placeholders
-   - Toast messages
-   - Calendar date formatting (locale parameter: `"en-US"` → `language === "el" ? "el-GR" : "en-US"`)
-   - Booking widget (public-facing)
+```typescript
+const fetchShop = useCallback(async () => {
+  setState(prev => ({ ...prev, loading: true }));  // ADD THIS LINE
+  if (!user) { ... }
+  // rest unchanged
+```
 
-### Files affected
-- **New**: `src/i18n/en.ts`, `src/i18n/el.ts`, `src/hooks/useLanguage.tsx`
-- **Modified**: `src/App.tsx` (wrap with LanguageProvider), `src/components/DashboardLayout.tsx`, `src/pages/AuthPage.tsx`, `src/pages/CalendarPage.tsx`, `src/pages/ClientsPage.tsx`, `src/pages/ServicesPage.tsx`, `src/pages/StaffPage.tsx`, `src/pages/InventoryPage.tsx`, `src/pages/ExpensesPage.tsx`, `src/pages/ReportsPage.tsx`, `src/pages/SettingsPage.tsx`, `src/pages/MyStatsPage.tsx`, `src/pages/BookingWidget.tsx`, `src/pages/OnboardingPage.tsx`, `src/components/calendar/CalendarHeader.tsx`, `src/components/calendar/NewBookingDialog.tsx`, `src/components/calendar/EditBookingDialog.tsx`, and other calendar/component files
+### 2. Fix `ProtectedRoute.tsx` -- await refetch before clearing state
 
-### Technical details
-- Translation keys will be flat dot-notation strings: `t("sidebar.calendar")`, `t("auth.signIn")`
-- Date locale strings (`toLocaleDateString`, `toLocaleString`) will use the language context to pass `"el-GR"` or `"en-US"`
-- No new dependencies required
+Move `setAcceptingInvite(false)` **after** `refetch()` completes, not in the `finally` block. This prevents the brief window where both `acceptingInvite` and `hasShop` are false.
+
+```typescript
+const accept = async () => {
+  setAcceptingInvite(true);
+  try {
+    const { error } = await supabase.rpc("accept_invitation", { _invite_code: pendingCode });
+    if (error) throw error;
+    localStorage.removeItem("pending_invite_code");
+    toast.success("Welcome to the team!");
+    await refetch();          // AWAIT the refetch
+  } catch (e: any) {
+    console.error("Failed to accept invitation:", e);
+    localStorage.removeItem("pending_invite_code");
+    toast.error(e.message || "Failed to accept invitation");
+  } finally {
+    setAcceptingInvite(false);
+    setInviteHandled(true);
+  }
+};
+```
+
+The key change is making `refetch` return a promise and awaiting it, so the `finally` block only runs after `hasShop` has been updated in state.
+
+### 3. Make `fetchShop` return a Promise properly
+
+The `refetch` function is just `fetchShop` which is already async, so it already returns a Promise -- it just needs to be awaited in ProtectedRoute. No change needed in `useShop` beyond adding the loading state reset.
+
+### Files to modify
+- `src/hooks/useShop.tsx` (1 line addition)
+- `src/components/ProtectedRoute.tsx` (add `await` to `refetch()`)
 
