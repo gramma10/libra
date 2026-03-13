@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useRole } from "@/hooks/useRole";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface EditBookingDialogProps {
   open: boolean;
@@ -20,6 +21,7 @@ interface EditBookingDialogProps {
 
 export default function EditBookingDialog({ open, onOpenChange, appointment, services, staff, onUpdated }: EditBookingDialogProps) {
   const { isAdmin, isManager, isStaff, staffRecordId } = useRole();
+  const { t } = useLanguage();
   const [serviceId, setServiceId] = useState("");
   const [staffId, setStaffId] = useState("");
   const [startTime, setStartTime] = useState("");
@@ -60,7 +62,7 @@ export default function EditBookingDialog({ open, onOpenChange, appointment, ser
 
     if (error) toast.error(error.message);
     else {
-      toast.success("Appointment updated");
+      toast.success(t("editBooking.updated"));
       onOpenChange(false);
       onUpdated();
     }
@@ -73,7 +75,7 @@ export default function EditBookingDialog({ open, onOpenChange, appointment, ser
     const { error } = await supabase.from("appointments").delete().eq("id", appointment.id);
     if (error) toast.error(error.message);
     else {
-      toast.success("Appointment deleted");
+      toast.success(t("editBooking.deleted"));
       onOpenChange(false);
       onUpdated();
     }
@@ -82,7 +84,6 @@ export default function EditBookingDialog({ open, onOpenChange, appointment, ser
 
   if (!appointment) return null;
 
-  // Staff can only edit their own appointments
   const isOwnAppointment = isStaff && appointment.staff_id === staffRecordId;
   const canEdit = isAdmin || isManager || isOwnAppointment;
   const canDelete = isAdmin || isManager || isOwnAppointment;
@@ -98,18 +99,17 @@ export default function EditBookingDialog({ open, onOpenChange, appointment, ser
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="rounded-2xl">
         <DialogHeader>
-          <DialogTitle>Edit Appointment</DialogTitle>
+          <DialogTitle>{t("editBooking.title")}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          {/* Client info (read-only, enhanced) */}
           <div className="rounded-xl bg-muted p-4 space-y-2">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-semibold">{clientName || "Unknown Client"}</p>
+                <p className="text-sm font-semibold">{clientName || t("editBooking.unknownClient")}</p>
               </div>
               <div className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${appointment.reminder_sent ? 'bg-primary/10 text-primary' : 'bg-muted-foreground/10 text-muted-foreground'}`}>
                 {appointment.reminder_sent ? <Bell className="h-3 w-3" /> : <BellOff className="h-3 w-3" />}
-                {appointment.reminder_sent ? 'Reminder Sent' : 'No Reminder'}
+                {appointment.reminder_sent ? t("editBooking.reminderSent") : t("editBooking.noReminder")}
               </div>
             </div>
             {clientPhone && (
@@ -126,16 +126,16 @@ export default function EditBookingDialog({ open, onOpenChange, appointment, ser
             )}
             {(clientNotes || clientTechNotes) && (
               <div className="border-t border-border/50 pt-2 mt-2 space-y-1">
-                {clientNotes && <p className="text-xs text-muted-foreground"><span className="font-medium">Preferences:</span> {clientNotes}</p>}
-                {clientTechNotes && <p className="text-xs text-muted-foreground"><span className="font-medium">Tech Notes:</span> {clientTechNotes}</p>}
+                {clientNotes && <p className="text-xs text-muted-foreground"><span className="font-medium">{t("editBooking.preferences")}:</span> {clientNotes}</p>}
+                {clientTechNotes && <p className="text-xs text-muted-foreground"><span className="font-medium">{t("editBooking.techNotes")}:</span> {clientTechNotes}</p>}
               </div>
             )}
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Service</label>
+            <label className="text-sm font-medium">{t("booking.service")}</label>
             <Select value={serviceId} onValueChange={setServiceId}>
-              <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select service" /></SelectTrigger>
+              <SelectTrigger className="rounded-xl"><SelectValue placeholder={t("booking.selectService")} /></SelectTrigger>
               <SelectContent>
                 {services.map((s: any) => (
                   <SelectItem key={s.id} value={s.id}>{s.service_name} ({s.duration} min)</SelectItem>
@@ -145,9 +145,9 @@ export default function EditBookingDialog({ open, onOpenChange, appointment, ser
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Employee</label>
+            <label className="text-sm font-medium">{t("booking.employee")}</label>
             <Select value={staffId} onValueChange={setStaffId}>
-              <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select employee" /></SelectTrigger>
+              <SelectTrigger className="rounded-xl"><SelectValue placeholder={t("booking.selectEmployee")} /></SelectTrigger>
               <SelectContent>
                 {staff.map((s: any) => (
                   <SelectItem key={s.id} value={s.id}>{s.first_name} {s.last_name}</SelectItem>
@@ -157,13 +157,13 @@ export default function EditBookingDialog({ open, onOpenChange, appointment, ser
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Time</label>
+            <label className="text-sm font-medium">{t("booking.time")}</label>
             <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="rounded-xl" />
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Internal Notes</label>
-            <Textarea value={internalNotes} onChange={(e) => setInternalNotes(e.target.value)} className="rounded-xl" rows={2} placeholder="Notes visible only to staff..." />
+            <label className="text-sm font-medium">{t("editBooking.internalNotes")}</label>
+            <Textarea value={internalNotes} onChange={(e) => setInternalNotes(e.target.value)} className="rounded-xl" rows={2} placeholder={t("editBooking.notesPlaceholder")} />
           </div>
 
           <Button
@@ -171,7 +171,7 @@ export default function EditBookingDialog({ open, onOpenChange, appointment, ser
             className={`w-full rounded-xl ${isNoShow ? "bg-muted-foreground text-background hover:bg-muted-foreground/80" : ""}`}
             onClick={() => setIsNoShow(!isNoShow)}
           >
-            {isNoShow ? "Marked as No-Show" : "Mark as No-Show"}
+            {isNoShow ? t("editBooking.markedNoShow") : t("editBooking.markNoShow")}
           </Button>
 
           {canEdit ? (
@@ -184,17 +184,17 @@ export default function EditBookingDialog({ open, onOpenChange, appointment, ser
                     </Button>
                   ) : (
                     <Button variant="destructive" className="rounded-xl" onClick={handleDelete} disabled={deleting}>
-                      {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Delete"}
+                      {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : t("editBooking.confirmDelete")}
                     </Button>
                   )
                 )}
                 <Button className="rounded-xl flex-1" onClick={handleSave} disabled={saving}>
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Changes"}
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : t("editBooking.saveChanges")}
                 </Button>
               </div>
             </>
           ) : (
-            <p className="text-xs text-muted-foreground text-center">You can only view this appointment. Edit is restricted to your own appointments.</p>
+            <p className="text-xs text-muted-foreground text-center">{t("editBooking.viewOnly")}</p>
           )}
         </div>
       </DialogContent>

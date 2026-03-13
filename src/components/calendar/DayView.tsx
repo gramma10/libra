@@ -1,9 +1,9 @@
 import { useRef, useEffect } from "react";
 import { Bell } from "lucide-react";
+import { useLanguage } from "@/hooks/useLanguage";
 
-const HOURS = Array.from({ length: 14 }, (_, i) => i + 7); // 7 AM - 8 PM
+const HOURS = Array.from({ length: 14 }, (_, i) => i + 7);
 const HOUR_HEIGHT = 64;
-const formatHour = (h: number) => (h > 12 ? `${h - 12} PM` : h === 12 ? "12 PM" : `${h} AM`);
 
 const STAFF_COLORS = [
   "hsl(210 80% 55%)", "hsl(340 75% 55%)", "hsl(150 60% 45%)",
@@ -20,6 +20,12 @@ interface DayViewProps {
 
 export default function DayView({ date, staff, appointments, onCellClick, onAppointmentClick }: DayViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { locale } = useLanguage();
+
+  const formatHour = (h: number) => {
+    if (locale === "el-GR") return `${h}:00`;
+    return h > 12 ? `${h - 12} PM` : h === 12 ? "12 PM" : `${h} AM`;
+  };
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
@@ -29,7 +35,6 @@ export default function DayView({ date, staff, appointments, onCellClick, onAppo
 
   return (
     <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
-      {/* Staff header */}
       <div className="flex border-b border-border bg-muted/30 flex-shrink-0">
         <div className="w-16 flex-shrink-0 border-r border-border" />
         {staff.map((s, i) => (
@@ -59,7 +64,6 @@ export default function DayView({ date, staff, appointments, onCellClick, onAppo
             </div>
           ))}
 
-          {/* Appointment blocks */}
           {staff.map((s, colIndex) => {
             const staffAppts = appointments.filter((a: any) => a.staff_id === s.id);
             return staffAppts.map((appt: any) => {
@@ -87,7 +91,6 @@ export default function DayView({ date, staff, appointments, onCellClick, onAppo
             });
           })}
 
-          {/* Current time indicator */}
           {date.toDateString() === today.toDateString() && (() => {
             const now = new Date();
             const nowOffset = (now.getHours() + now.getMinutes() / 60 - HOURS[0]) * HOUR_HEIGHT;

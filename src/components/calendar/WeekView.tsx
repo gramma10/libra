@@ -1,12 +1,13 @@
 import { useRef, useEffect } from "react";
+import { Bell } from "lucide-react";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const HOURS = Array.from({ length: 14 }, (_, i) => i + 7);
 const HOUR_HEIGHT = 56;
-const formatHour = (h: number) => (h > 12 ? `${h - 12} PM` : h === 12 ? "12 PM" : `${h} AM`);
 
 const getWeekDays = (date: Date) => {
   const start = new Date(date);
-  start.setDate(start.getDate() - start.getDay() + 1); // Monday
+  start.setDate(start.getDate() - start.getDay() + 1);
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(start);
     d.setDate(d.getDate() + i);
@@ -22,8 +23,14 @@ interface WeekViewProps {
 
 export default function WeekView({ date, appointments, onCellClick }: WeekViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { locale } = useLanguage();
   const days = getWeekDays(date);
   const today = new Date();
+
+  const formatHour = (h: number) => {
+    if (locale === "el-GR") return `${h}:00`;
+    return h > 12 ? `${h - 12} PM` : h === 12 ? "12 PM" : `${h} AM`;
+  };
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
@@ -31,14 +38,13 @@ export default function WeekView({ date, appointments, onCellClick }: WeekViewPr
 
   return (
     <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
-      {/* Day headers */}
       <div className="flex border-b border-border bg-muted/30 flex-shrink-0">
         <div className="w-16 flex-shrink-0 border-r border-border" />
         {days.map((d) => {
           const isToday = d.toDateString() === today.toDateString();
           return (
             <div key={d.toISOString()} className="flex-1 min-w-[100px] px-2 py-2.5 text-center border-r border-border last:border-r-0">
-              <span className="text-[10px] text-muted-foreground uppercase">{d.toLocaleDateString("en-US", { weekday: "short" })}</span>
+              <span className="text-[10px] text-muted-foreground uppercase">{d.toLocaleDateString(locale, { weekday: "short" })}</span>
               <div className={`text-lg font-semibold mt-0.5 ${isToday ? "text-primary" : "text-foreground"}`}>
                 {d.getDate()}
               </div>
@@ -63,7 +69,6 @@ export default function WeekView({ date, appointments, onCellClick }: WeekViewPr
             </div>
           ))}
 
-          {/* Appointment blocks */}
           {days.map((day, colIndex) => {
             const dayStr = day.toDateString();
             const dayAppts = appointments.filter((a: any) => new Date(a.start_time).toDateString() === dayStr);
@@ -88,7 +93,6 @@ export default function WeekView({ date, appointments, onCellClick }: WeekViewPr
             });
           })}
 
-          {/* Current time */}
           {days.some(d => d.toDateString() === today.toDateString()) && (() => {
             const now = new Date();
             const nowOffset = (now.getHours() + now.getMinutes() / 60 - HOURS[0]) * HOUR_HEIGHT;

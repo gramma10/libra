@@ -9,11 +9,13 @@ import WeekView from "@/components/calendar/WeekView";
 import MonthView from "@/components/calendar/MonthView";
 import NewBookingDialog from "@/components/calendar/NewBookingDialog";
 import EditBookingDialog from "@/components/calendar/EditBookingDialog";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const today = new Date();
 
 export default function CalendarPage() {
   const { shopId } = useShop();
+  const { t } = useLanguage();
   const [currentDate, setCurrentDate] = useState(today);
   const [view, setView] = useState<CalendarView>("day");
   const [appointments, setAppointments] = useState<any[]>([]);
@@ -92,7 +94,7 @@ export default function CalendarPage() {
         <div className="flex justify-center py-20 flex-1"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
       ) : view === "day" ? (
         staff.length === 0 ? (
-          <div className="flex-1 flex items-center justify-center"><p className="text-muted-foreground text-sm">Add employees first to see the calendar columns.</p></div>
+          <div className="flex-1 flex items-center justify-center"><p className="text-muted-foreground text-sm">{t("calendar.addEmployeesFirst")}</p></div>
         ) : (
           <DayView date={currentDate} staff={staff} appointments={appointments} onCellClick={handleCellClick} onAppointmentClick={(appt) => setEditingAppointment(appt)} />
         )
