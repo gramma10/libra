@@ -31,12 +31,16 @@ const defaultFilters: FilterValues = {
 
 export default function ClientsPage() {
   const { shopId } = useShop();
+  const { t, locale } = useLanguage();
   const [clients, setClients] = useState<any[]>([]);
   const [selected, setSelected] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ first_name: "", last_name: "", phone_mobile: "", email: "", tech_notes: "", personal_preferences: "" });
+  const [editForm, setEditForm] = useState({ first_name: "", last_name: "", phone_mobile: "", email: "", tech_notes: "", personal_preferences: "" });
   const [clientAppointments, setClientAppointments] = useState<any[]>([]);
   const [loadingAppts, setLoadingAppts] = useState(false);
   const [filters, setFilters] = useState<FilterValues>(defaultFilters);
