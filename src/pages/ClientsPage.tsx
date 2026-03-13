@@ -339,6 +339,16 @@ export default function ClientsPage() {
                     {selected.email && <span className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" strokeWidth={1.5} />{selected.email}</span>}
                   </div>
                 </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={openEdit}>
+                    <Pencil className="h-3.5 w-3.5" strokeWidth={1.5} />
+                    {t("clients.editClient")}
+                  </Button>
+                  <Button variant="outline" size="sm" className="rounded-xl gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30" onClick={() => setShowDelete(true)}>
+                    <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+                    {t("clients.deleteClient")}
+                  </Button>
+                </div>
               </div>
 
               {loadingAppts ? (
