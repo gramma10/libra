@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Plus, Phone, Mail, ChevronRight, Loader2, CalendarDays, DollarSign, UserX, Clock } from "lucide-react";
+import { Plus, Phone, Mail, ChevronRight, Loader2, CalendarDays, DollarSign, UserX, Clock, Pencil, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -8,8 +8,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useShop } from "@/hooks/useShop";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import ClientFilters from "@/components/clients/ClientFilters";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface FilterValues {
   search: string;
