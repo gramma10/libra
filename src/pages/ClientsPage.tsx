@@ -207,7 +207,52 @@ export default function ClientsPage() {
     setSaving(false);
   };
 
-  const handleExportCSV = useCallback(() => {
+  const openEdit = () => {
+    if (!selected) return;
+    setEditForm({
+      first_name: selected.first_name,
+      last_name: selected.last_name,
+      phone_mobile: selected.phone_mobile,
+      email: selected.email || "",
+      tech_notes: selected.tech_notes || "",
+      personal_preferences: selected.personal_preferences || "",
+    });
+    setShowEdit(true);
+  };
+
+  const handleEdit = async () => {
+    if (!editForm.first_name || !editForm.last_name || !editForm.phone_mobile) {
+      toast.error(t("clients.namePhoneRequired"));
+      return;
+    }
+    setSaving(true);
+    const { error } = await supabase.from("clients").update(editForm).eq("id", selected.id);
+    if (error) toast.error(error.message);
+    else {
+      toast.success(t("clients.updated"));
+      setShowEdit(false);
+      const updatedClient = { ...selected, ...editForm };
+      setSelected(updatedClient);
+      fetchClients();
+    }
+    setSaving(false);
+  };
+
+  const handleDelete = async () => {
+    if (!selected) return;
+    setSaving(true);
+    const { error } = await supabase.from("clients").delete().eq("id", selected.id);
+    if (error) toast.error(error.message);
+    else {
+      toast.success(t("clients.deleted"));
+      setShowDelete(false);
+      setSelected(null);
+      fetchClients();
+    }
+    setSaving(false);
+  };
+
+
     if (filtered.length === 0) {
       toast.error("No clients to export");
       return;
