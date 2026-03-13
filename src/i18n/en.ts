@@ -112,6 +112,16 @@ export const en = {
   "clients.phone": "Phone",
   "clients.emailLabel": "Email",
   "clients.techNotesLabel": "Technical Notes",
+  "clients.editClient": "Edit Client",
+  "clients.deleteClient": "Delete Client",
+  "clients.deleteConfirm": "Are you sure you want to delete this client? This action cannot be undone.",
+  "clients.deleted": "Client deleted",
+  "clients.updated": "Client updated",
+  "clients.save": "Save Changes",
+  "clients.cancel": "Cancel",
+  "clients.delete": "Delete",
+  "clients.firstName": "First Name",
+  "clients.lastName": "Last Name",
 
   // Services
   "services.title": "Services",

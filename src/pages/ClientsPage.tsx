@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Plus, Phone, Mail, ChevronRight, Loader2, CalendarDays, DollarSign, UserX, Clock } from "lucide-react";
+import { Plus, Phone, Mail, ChevronRight, Loader2, CalendarDays, DollarSign, UserX, Clock, Pencil, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -8,8 +8,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useShop } from "@/hooks/useShop";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import ClientFilters from "@/components/clients/ClientFilters";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface FilterValues {
   search: string;
@@ -29,12 +31,16 @@ const defaultFilters: FilterValues = {
 
 export default function ClientsPage() {
   const { shopId } = useShop();
+  const { t, locale } = useLanguage();
   const [clients, setClients] = useState<any[]>([]);
   const [selected, setSelected] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ first_name: "", last_name: "", phone_mobile: "", email: "", tech_notes: "", personal_preferences: "" });
+  const [editForm, setEditForm] = useState({ first_name: "", last_name: "", phone_mobile: "", email: "", tech_notes: "", personal_preferences: "" });
   const [clientAppointments, setClientAppointments] = useState<any[]>([]);
   const [loadingAppts, setLoadingAppts] = useState(false);
   const [filters, setFilters] = useState<FilterValues>(defaultFilters);
@@ -201,6 +207,51 @@ export default function ClientsPage() {
     setSaving(false);
   };
 
+  const openEdit = () => {
+    if (!selected) return;
+    setEditForm({
+      first_name: selected.first_name,
+      last_name: selected.last_name,
+      phone_mobile: selected.phone_mobile,
+      email: selected.email || "",
+      tech_notes: selected.tech_notes || "",
+      personal_preferences: selected.personal_preferences || "",
+    });
+    setShowEdit(true);
+  };
+
+  const handleEdit = async () => {
+    if (!editForm.first_name || !editForm.last_name || !editForm.phone_mobile) {
+      toast.error(t("clients.namePhoneRequired"));
+      return;
+    }
+    setSaving(true);
+    const { error } = await supabase.from("clients").update(editForm).eq("id", selected.id);
+    if (error) toast.error(error.message);
+    else {
+      toast.success(t("clients.updated"));
+      setShowEdit(false);
+      const updatedClient = { ...selected, ...editForm };
+      setSelected(updatedClient);
+      fetchClients();
+    }
+    setSaving(false);
+  };
+
+  const handleDelete = async () => {
+    if (!selected) return;
+    setSaving(true);
+    const { error } = await supabase.from("clients").delete().eq("id", selected.id);
+    if (error) toast.error(error.message);
+    else {
+      toast.success(t("clients.deleted"));
+      setShowDelete(false);
+      setSelected(null);
+      fetchClients();
+    }
+    setSaving(false);
+  };
+
   const handleExportCSV = useCallback(() => {
     if (filtered.length === 0) {
       toast.error("No clients to export");
@@ -287,6 +338,16 @@ export default function ClientsPage() {
                     <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" strokeWidth={1.5} />{selected.phone_mobile}</span>
                     {selected.email && <span className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" strokeWidth={1.5} />{selected.email}</span>}
                   </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={openEdit}>
+                    <Pencil className="h-3.5 w-3.5" strokeWidth={1.5} />
+                    {t("clients.editClient")}
+                  </Button>
+                  <Button variant="outline" size="sm" className="rounded-xl gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30" onClick={() => setShowDelete(true)}>
+                    <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+                    {t("clients.deleteClient")}
+                  </Button>
                 </div>
               </div>
 
@@ -428,6 +489,65 @@ export default function ClientsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Client Dialog */}
+      <Dialog open={showEdit} onOpenChange={setShowEdit}>
+        <DialogContent className="rounded-2xl">
+          <DialogHeader><DialogTitle>{t("clients.editClient")}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-sm font-medium">{t("clients.firstName")} *</label>
+                <Input value={editForm.first_name} onChange={(e) => setEditForm({ ...editForm, first_name: e.target.value })} className="rounded-xl" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">{t("clients.lastName")} *</label>
+                <Input value={editForm.last_name} onChange={(e) => setEditForm({ ...editForm, last_name: e.target.value })} className="rounded-xl" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">{t("clients.phone")} *</label>
+              <Input value={editForm.phone_mobile} onChange={(e) => setEditForm({ ...editForm, phone_mobile: e.target.value })} className="rounded-xl" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">{t("clients.emailLabel")}</label>
+              <Input value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} className="rounded-xl" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">{t("clients.techNotesLabel")}</label>
+              <Textarea value={editForm.tech_notes} onChange={(e) => setEditForm({ ...editForm, tech_notes: e.target.value })} className="rounded-xl" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">{t("clients.preferencesLabel")}</label>
+              <Textarea value={editForm.personal_preferences} onChange={(e) => setEditForm({ ...editForm, personal_preferences: e.target.value })} className="rounded-xl" />
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setShowEdit(false)}>{t("clients.cancel")}</Button>
+              <Button className="flex-1 rounded-xl" onClick={handleEdit} disabled={saving}>
+                {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                {t("clients.save")}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={showDelete} onOpenChange={setShowDelete}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("clients.deleteClient")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("clients.deleteConfirm")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">{t("clients.cancel")}</AlertDialogCancel>
+            <AlertDialogAction className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={handleDelete} disabled={saving}>
+              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+              {t("clients.delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </motion.div>
   );
 }
