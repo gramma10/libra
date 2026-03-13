@@ -489,6 +489,65 @@ export default function ClientsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Client Dialog */}
+      <Dialog open={showEdit} onOpenChange={setShowEdit}>
+        <DialogContent className="rounded-2xl">
+          <DialogHeader><DialogTitle>{t("clients.editClient")}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-sm font-medium">{t("clients.firstName")} *</label>
+                <Input value={editForm.first_name} onChange={(e) => setEditForm({ ...editForm, first_name: e.target.value })} className="rounded-xl" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">{t("clients.lastName")} *</label>
+                <Input value={editForm.last_name} onChange={(e) => setEditForm({ ...editForm, last_name: e.target.value })} className="rounded-xl" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">{t("clients.phone")} *</label>
+              <Input value={editForm.phone_mobile} onChange={(e) => setEditForm({ ...editForm, phone_mobile: e.target.value })} className="rounded-xl" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">{t("clients.emailLabel")}</label>
+              <Input value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} className="rounded-xl" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">{t("clients.techNotesLabel")}</label>
+              <Textarea value={editForm.tech_notes} onChange={(e) => setEditForm({ ...editForm, tech_notes: e.target.value })} className="rounded-xl" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">{t("clients.preferencesLabel")}</label>
+              <Textarea value={editForm.personal_preferences} onChange={(e) => setEditForm({ ...editForm, personal_preferences: e.target.value })} className="rounded-xl" />
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setShowEdit(false)}>{t("clients.cancel")}</Button>
+              <Button className="flex-1 rounded-xl" onClick={handleEdit} disabled={saving}>
+                {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                {t("clients.save")}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={showDelete} onOpenChange={setShowDelete}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("clients.deleteClient")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("clients.deleteConfirm")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">{t("clients.cancel")}</AlertDialogCancel>
+            <AlertDialogAction className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={handleDelete} disabled={saving}>
+              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+              {t("clients.delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </motion.div>
   );
 }
