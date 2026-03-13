@@ -252,7 +252,7 @@ export default function ClientsPage() {
     setSaving(false);
   };
 
-
+  const handleExportCSV = useCallback(() => {
     if (filtered.length === 0) {
       toast.error("No clients to export");
       return;
