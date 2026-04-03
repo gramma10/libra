@@ -330,11 +330,11 @@ export default function ClientsPage() {
           </div>
 
           {selected && (
-            <motion.div key={selected.id} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3 }} className="flex-1 rounded-2xl border border-border bg-card shadow-apple p-6 space-y-6">
-              <div className="flex items-start justify-between">
+            <motion.div key={selected.id} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3 }} className="flex-1 rounded-2xl border border-border bg-card shadow-apple p-4 md:p-6 space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-xl font-semibold">{selected.first_name} {selected.last_name}</h2>
-                  <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                  <h2 className="text-lg md:text-xl font-semibold">{selected.first_name} {selected.last_name}</h2>
+                  <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" strokeWidth={1.5} />{selected.phone_mobile}</span>
                     {selected.email && <span className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" strokeWidth={1.5} />{selected.email}</span>}
                   </div>
@@ -342,11 +342,11 @@ export default function ClientsPage() {
                 <div className="flex items-center gap-2">
                   <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={openEdit}>
                     <Pencil className="h-3.5 w-3.5" strokeWidth={1.5} />
-                    {t("clients.editClient")}
+                    <span className="hidden sm:inline">{t("clients.editClient")}</span>
                   </Button>
                   <Button variant="outline" size="sm" className="rounded-xl gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30" onClick={() => setShowDelete(true)}>
                     <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
-                    {t("clients.deleteClient")}
+                    <span className="hidden sm:inline">{t("clients.deleteClient")}</span>
                   </Button>
                 </div>
               </div>
