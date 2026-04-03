@@ -34,7 +34,7 @@ export default function DayView({ date, staff, appointments, onCellClick, onAppo
   const today = new Date();
 
   return (
-    <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
+    <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden flex flex-col flex-1 min-h-0 min-w-0">
       <div className="flex border-b border-border bg-muted/30 flex-shrink-0">
         <div className="w-16 flex-shrink-0 border-r border-border" />
         {staff.map((s, i) => (
