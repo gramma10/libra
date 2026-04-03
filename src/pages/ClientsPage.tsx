@@ -287,8 +287,37 @@ export default function ClientsPage() {
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="space-y-6">
+      {/* Global average ticket */}
+      {!loading && clients.length > 0 && (
+        <div className="rounded-xl border border-border bg-card shadow-apple p-4 flex items-center gap-3">
+          <Receipt className="h-5 w-5 text-primary" strokeWidth={1.5} />
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t("clients.globalAvgTicket")}</p>
+            <p className="text-xl font-bold">
+              €{(() => {
+                const totalRevenue = Object.values(clientRevenue).reduce((s, v) => s + v, 0);
+                const totalVisits = Object.keys(clientRevenue).reduce((s, cid) => {
+                  const lastVisit = clientLastVisit[cid];
+                  return lastVisit ? s + 1 : s;
+                }, 0);
+                // Count actual completed visits per client from appointment data
+                return totalVisits > 0 ? (totalRevenue / (() => {
+                  // We need total visit count, not unique clients
+                  let count = 0;
+                  Object.values(clientRevenue).forEach((rev, i) => {
+                    const cid = Object.keys(clientRevenue)[i];
+                    if (rev > 0) count++;
+                  });
+                  return count || 1;
+                })()).toFixed(0) : "0";
+              })()}
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">Clients</h1>
+        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">{t("clients.title")}</h1>
         <Button className="rounded-xl gap-2 shrink-0" onClick={() => setShowAdd(true)}>
           <Plus className="h-4 w-4" strokeWidth={1.5} />
           <span className="hidden sm:inline">Add Client</span>
