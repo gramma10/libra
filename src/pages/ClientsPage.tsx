@@ -48,6 +48,7 @@ export default function ClientsPage() {
   const [clientServiceMap, setClientServiceMap] = useState<Record<string, Set<string>>>({});
   const [clientLastVisit, setClientLastVisit] = useState<Record<string, Date>>({});
   const [clientRevenue, setClientRevenue] = useState<Record<string, number>>({});
+  const [clientVisitCount, setClientVisitCount] = useState<Record<string, number>>({});
 
   const fetchClients = async () => {
     setLoading(true);
