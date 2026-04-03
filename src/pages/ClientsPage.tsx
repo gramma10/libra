@@ -101,6 +101,7 @@ export default function ClientsPage() {
         setClientServiceMap(serviceMap);
         setClientLastVisit(lastVisitMap);
         setClientRevenue(revenueMap);
+        setClientVisitCount(visitCountMap);
       });
   }, []);
 
