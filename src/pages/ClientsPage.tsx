@@ -285,19 +285,20 @@ export default function ClientsPage() {
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">Clients</h1>
-        <Button className="rounded-xl gap-2" onClick={() => setShowAdd(true)}>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">Clients</h1>
+        <Button className="rounded-xl gap-2 shrink-0" onClick={() => setShowAdd(true)}>
           <Plus className="h-4 w-4" strokeWidth={1.5} />
-          Add Client
+          <span className="hidden sm:inline">Add Client</span>
+          <span className="sm:hidden">Add</span>
         </Button>
       </div>
 
       {loading ? (
         <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
       ) : (
-        <div className="flex gap-6 min-h-[calc(100vh-12rem)]">
-          <div className="w-80 shrink-0 space-y-3">
+        <div className="flex flex-col md:flex-row gap-4 md:gap-6 min-h-[calc(100vh-12rem)]">
+          <div className="w-full md:w-80 shrink-0 space-y-3">
             <ClientFilters
               filters={filters}
               onFilterChange={setFilters}
@@ -330,11 +331,11 @@ export default function ClientsPage() {
           </div>
 
           {selected && (
-            <motion.div key={selected.id} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3 }} className="flex-1 rounded-2xl border border-border bg-card shadow-apple p-6 space-y-6">
-              <div className="flex items-start justify-between">
+            <motion.div key={selected.id} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3 }} className="flex-1 rounded-2xl border border-border bg-card shadow-apple p-4 md:p-6 space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-xl font-semibold">{selected.first_name} {selected.last_name}</h2>
-                  <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                  <h2 className="text-lg md:text-xl font-semibold">{selected.first_name} {selected.last_name}</h2>
+                  <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" strokeWidth={1.5} />{selected.phone_mobile}</span>
                     {selected.email && <span className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" strokeWidth={1.5} />{selected.email}</span>}
                   </div>
@@ -342,11 +343,11 @@ export default function ClientsPage() {
                 <div className="flex items-center gap-2">
                   <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={openEdit}>
                     <Pencil className="h-3.5 w-3.5" strokeWidth={1.5} />
-                    {t("clients.editClient")}
+                    <span className="hidden sm:inline">{t("clients.editClient")}</span>
                   </Button>
                   <Button variant="outline" size="sm" className="rounded-xl gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30" onClick={() => setShowDelete(true)}>
                     <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
-                    {t("clients.deleteClient")}
+                    <span className="hidden sm:inline">{t("clients.deleteClient")}</span>
                   </Button>
                 </div>
               </div>
@@ -392,7 +393,7 @@ export default function ClientsPage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Technical Notes</h3>
                   <div className="rounded-xl bg-muted p-3 text-sm whitespace-pre-wrap">
@@ -414,7 +415,7 @@ export default function ClientsPage() {
               {clientAppointments.length > 0 && (
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Recent Appointments</h3>
-                  <div className="rounded-xl border border-border overflow-hidden">
+                  <div className="rounded-xl border border-border overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b bg-muted/50">

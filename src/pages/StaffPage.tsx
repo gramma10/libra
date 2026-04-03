@@ -116,7 +116,7 @@ export default function StaffPage() {
         <Button onClick={openAdd} className="gap-2"><Plus className="h-4 w-4" /> {t("staff.addEmployee")}</Button>
       </div>
 
-      <div className="glass rounded-2xl shadow-apple overflow-hidden">
+      <div className="glass rounded-2xl shadow-apple overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
