@@ -35,12 +35,12 @@ export default function CalendarHeader({ currentDate, view, onViewChange, onNavi
   };
 
   return (
-    <div className="flex items-center justify-between pb-4 flex-shrink-0">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 flex-shrink-0 gap-3">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("calendar.title")}</h1>
+        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">{t("calendar.title")}</h1>
         <p className="text-sm text-muted-foreground mt-0.5">{formatDate(currentDate, view)}</p>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <div className="flex rounded-xl border border-border overflow-hidden">
           {(["day", "week", "month"] as CalendarView[]).map((v) => (
             <button
@@ -52,16 +52,19 @@ export default function CalendarHeader({ currentDate, view, onViewChange, onNavi
             </button>
           ))}
         </div>
-        <Button variant="outline" size="icon" className="rounded-xl" onClick={() => onNavigate(-1)}>
-          <ChevronLeft className="h-4 w-4" strokeWidth={1.5} />
-        </Button>
-        <Button variant="outline" className="rounded-xl px-4 text-sm" onClick={onToday}>{t("calendar.today")}</Button>
-        <Button variant="outline" size="icon" className="rounded-xl" onClick={() => onNavigate(1)}>
-          <ChevronRight className="h-4 w-4" strokeWidth={1.5} />
-        </Button>
-        <Button className="rounded-xl ml-2 gap-2" onClick={onNewBooking}>
-          <Plus className="h-4 w-4" strokeWidth={1.5} />
-          {t("calendar.newBooking")}
+        <div className="flex items-center gap-1">
+          <Button variant="outline" size="icon" className="rounded-xl h-8 w-8" onClick={() => onNavigate(-1)}>
+            <ChevronLeft className="h-4 w-4" strokeWidth={1.5} />
+          </Button>
+          <Button variant="outline" className="rounded-xl px-3 text-xs h-8" onClick={onToday}>{t("calendar.today")}</Button>
+          <Button variant="outline" size="icon" className="rounded-xl h-8 w-8" onClick={() => onNavigate(1)}>
+            <ChevronRight className="h-4 w-4" strokeWidth={1.5} />
+          </Button>
+        </div>
+        <Button className="rounded-xl gap-1.5 h-8 text-xs" onClick={onNewBooking}>
+          <Plus className="h-3.5 w-3.5" strokeWidth={1.5} />
+          <span className="hidden sm:inline">{t("calendar.newBooking")}</span>
+          <span className="sm:hidden">+</span>
         </Button>
       </div>
     </div>
