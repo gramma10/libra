@@ -417,9 +417,16 @@ export default function ClientsPage() {
                   <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-1">
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <UserX className="h-4 w-4" strokeWidth={1.5} />
-                      <span className="text-xs font-medium uppercase tracking-wide">No-Shows</span>
+                      <span className="text-xs font-medium uppercase tracking-wide">{t("clients.noShows")}</span>
                     </div>
                     <p className="text-2xl font-bold">{analytics.noShows}</p>
+                  </div>
+                  <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-1">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Receipt className="h-4 w-4" strokeWidth={1.5} />
+                      <span className="text-xs font-medium uppercase tracking-wide">{t("clients.avgTicket")}</span>
+                    </div>
+                    <p className="text-2xl font-bold">€{analytics.avgTicket.toFixed(0)}</p>
                   </div>
                 </div>
               )}
