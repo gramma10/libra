@@ -93,8 +93,9 @@ export default function ClientsPage() {
             lastVisitMap[a.client_id] = endTime;
           }
 
-          // Revenue
+          // Revenue & visit count
           revenueMap[a.client_id] = (revenueMap[a.client_id] || 0) + (a.services?.price || 0);
+          visitCountMap[a.client_id] = (visitCountMap[a.client_id] || 0) + 1;
         });
 
         setClientServiceMap(serviceMap);
