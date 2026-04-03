@@ -72,6 +72,7 @@ export default function ClientsPage() {
         const serviceMap: Record<string, Set<string>> = {};
         const lastVisitMap: Record<string, Date> = {};
         const revenueMap: Record<string, number> = {};
+        const visitCountMap: Record<string, number> = {};
         const now = new Date();
 
         (data || []).forEach((a: any) => {
