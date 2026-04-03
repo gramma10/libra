@@ -415,7 +415,7 @@ export default function ClientsPage() {
               {clientAppointments.length > 0 && (
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Recent Appointments</h3>
-                  <div className="rounded-xl border border-border overflow-hidden">
+                  <div className="rounded-xl border border-border overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b bg-muted/50">
