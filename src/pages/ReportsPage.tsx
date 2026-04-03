@@ -151,12 +151,12 @@ export default function ReportsPage() {
         {stats.map((stat, i) => (<StatCard key={stat.label} stat={stat} index={i} />))}
       </div>
 
-      <div className="rounded-2xl border border-border bg-card p-4 shadow-apple flex items-center justify-between">
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-apple flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
           <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{t("reports.thisWeek")}</p>
           <p className="text-lg font-semibold mt-0.5">{formatCurrency(weekRevenue)} <span className="text-sm font-normal text-muted-foreground">· {weekApptCount} {t("reports.appointmentsLabel")}</span></p>
         </div>
-        <div className="text-right">
+        <div className="sm:text-right">
           <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{monthLabel(viewDate)}</p>
           <p className="text-lg font-semibold mt-0.5">{formatCurrency(monthRevenue)} <span className="text-sm font-normal text-muted-foreground">· {monthAppts} {t("reports.apptsLabel")}</span></p>
         </div>

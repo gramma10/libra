@@ -146,7 +146,7 @@ export default function InventoryPage() {
       {loading ? (
         <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
       ) : (
-        <div className="rounded-2xl border border-border bg-card shadow-apple overflow-hidden">
+        <div className="rounded-2xl border border-border bg-card shadow-apple overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-border text-xs text-muted-foreground uppercase tracking-wide">

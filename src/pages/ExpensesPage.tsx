@@ -93,7 +93,7 @@ export default function ExpensesPage() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-border bg-card shadow-apple overflow-hidden">
+      <div className="rounded-2xl border border-border bg-card shadow-apple overflow-x-auto">
         {loading ? (
           <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
         ) : expenses.length === 0 ? (
