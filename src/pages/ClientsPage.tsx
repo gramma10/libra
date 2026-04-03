@@ -285,11 +285,12 @@ export default function ClientsPage() {
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">Clients</h1>
-        <Button className="rounded-xl gap-2" onClick={() => setShowAdd(true)}>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">Clients</h1>
+        <Button className="rounded-xl gap-2 shrink-0" onClick={() => setShowAdd(true)}>
           <Plus className="h-4 w-4" strokeWidth={1.5} />
-          Add Client
+          <span className="hidden sm:inline">Add Client</span>
+          <span className="sm:hidden">Add</span>
         </Button>
       </div>
 
