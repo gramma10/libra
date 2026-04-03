@@ -187,7 +187,9 @@ export default function ClientsPage() {
       const lastDate = new Date(pastVisits[0].end_time);
       lastVisitDays = Math.floor((now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
     }
-    return { totalAppts: validAppts.length, revenue, lastVisitDays, noShows };
+    const completedVisits = pastVisits.length;
+    const avgTicket = completedVisits > 0 ? revenue / completedVisits : 0;
+    return { totalAppts: validAppts.length, revenue, lastVisitDays, noShows, avgTicket };
   }, [clientAppointments]);
 
   const handleAdd = async () => {
