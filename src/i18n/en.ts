@@ -122,6 +122,8 @@ export const en = {
   "clients.delete": "Delete",
   "clients.firstName": "First Name",
   "clients.lastName": "Last Name",
+  "clients.avgTicket": "Avg. Ticket",
+  "clients.globalAvgTicket": "Overall Avg. Ticket (All Clients)",
 
   // Services
   "services.title": "Services",

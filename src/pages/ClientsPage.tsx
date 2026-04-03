@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Plus, Phone, Mail, ChevronRight, Loader2, CalendarDays, DollarSign, UserX, Clock, Pencil, Trash2 } from "lucide-react";
+import { Plus, Phone, Mail, ChevronRight, Loader2, CalendarDays, DollarSign, UserX, Clock, Pencil, Trash2, Receipt } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -48,6 +48,7 @@ export default function ClientsPage() {
   const [clientServiceMap, setClientServiceMap] = useState<Record<string, Set<string>>>({});
   const [clientLastVisit, setClientLastVisit] = useState<Record<string, Date>>({});
   const [clientRevenue, setClientRevenue] = useState<Record<string, number>>({});
+  const [clientVisitCount, setClientVisitCount] = useState<Record<string, number>>({});
 
   const fetchClients = async () => {
     setLoading(true);
@@ -71,6 +72,7 @@ export default function ClientsPage() {
         const serviceMap: Record<string, Set<string>> = {};
         const lastVisitMap: Record<string, Date> = {};
         const revenueMap: Record<string, number> = {};
+        const visitCountMap: Record<string, number> = {};
         const now = new Date();
 
         (data || []).forEach((a: any) => {
@@ -91,13 +93,15 @@ export default function ClientsPage() {
             lastVisitMap[a.client_id] = endTime;
           }
 
-          // Revenue
+          // Revenue & visit count
           revenueMap[a.client_id] = (revenueMap[a.client_id] || 0) + (a.services?.price || 0);
+          visitCountMap[a.client_id] = (visitCountMap[a.client_id] || 0) + 1;
         });
 
         setClientServiceMap(serviceMap);
         setClientLastVisit(lastVisitMap);
         setClientRevenue(revenueMap);
+        setClientVisitCount(visitCountMap);
       });
   }, []);
 
@@ -168,7 +172,7 @@ export default function ClientsPage() {
   }, [filtered]);
 
   const analytics = useMemo(() => {
-    if (!clientAppointments.length) return { totalAppts: 0, revenue: 0, lastVisitDays: null as number | null, noShows: 0 };
+    if (!clientAppointments.length) return { totalAppts: 0, revenue: 0, lastVisitDays: null as number | null, noShows: 0, avgTicket: 0 };
     const now = new Date();
     const validAppts = clientAppointments.filter((a) => a.status !== "Cancelled");
     const noShows = validAppts.filter((a) => a.status === "No-Show").length;
@@ -187,7 +191,9 @@ export default function ClientsPage() {
       const lastDate = new Date(pastVisits[0].end_time);
       lastVisitDays = Math.floor((now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
     }
-    return { totalAppts: validAppts.length, revenue, lastVisitDays, noShows };
+    const completedVisits = pastVisits.length;
+    const avgTicket = completedVisits > 0 ? revenue / completedVisits : 0;
+    return { totalAppts: validAppts.length, revenue, lastVisitDays, noShows, avgTicket };
   }, [clientAppointments]);
 
   const handleAdd = async () => {
@@ -285,8 +291,25 @@ export default function ClientsPage() {
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="space-y-6">
+      {/* Global average ticket */}
+      {!loading && clients.length > 0 && (
+        <div className="rounded-xl border border-border bg-card shadow-apple p-4 flex items-center gap-3">
+          <Receipt className="h-5 w-5 text-primary" strokeWidth={1.5} />
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t("clients.globalAvgTicket")}</p>
+            <p className="text-xl font-bold">
+              €{(() => {
+                const totalRevenue = Object.values(clientRevenue).reduce((s, v) => s + v, 0);
+                const totalVisits = Object.values(clientVisitCount).reduce((s, v) => s + v, 0);
+                return totalVisits > 0 ? (totalRevenue / totalVisits).toFixed(0) : "0";
+              })()}
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">Clients</h1>
+        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">{t("clients.title")}</h1>
         <Button className="rounded-xl gap-2 shrink-0" onClick={() => setShowAdd(true)}>
           <Plus className="h-4 w-4" strokeWidth={1.5} />
           <span className="hidden sm:inline">Add Client</span>
@@ -355,7 +378,7 @@ export default function ClientsPage() {
               {loadingAppts ? (
                 <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
               ) : (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                   <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-1">
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <CalendarDays className="h-4 w-4" strokeWidth={1.5} />
@@ -386,9 +409,16 @@ export default function ClientsPage() {
                   <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-1">
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <UserX className="h-4 w-4" strokeWidth={1.5} />
-                      <span className="text-xs font-medium uppercase tracking-wide">No-Shows</span>
+                      <span className="text-xs font-medium uppercase tracking-wide">{t("clients.noShows")}</span>
                     </div>
                     <p className="text-2xl font-bold">{analytics.noShows}</p>
+                  </div>
+                  <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-1">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Receipt className="h-4 w-4" strokeWidth={1.5} />
+                      <span className="text-xs font-medium uppercase tracking-wide">{t("clients.avgTicket")}</span>
+                    </div>
+                    <p className="text-2xl font-bold">€{analytics.avgTicket.toFixed(0)}</p>
                   </div>
                 </div>
               )}
