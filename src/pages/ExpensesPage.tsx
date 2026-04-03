@@ -76,16 +76,18 @@ export default function ExpensesPage() {
         <Button onClick={handleNew} className="rounded-xl gap-2"><Plus className="h-4 w-4" /> {t("expenses.newExpense")}</Button>
       </div>
 
-      <div className="flex items-center gap-3">
-        <Select value={filterMonth} onValueChange={setFilterMonth}>
-          <SelectTrigger className="w-[150px] rounded-xl"><SelectValue /></SelectTrigger>
-          <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={String(i)}>{m}</SelectItem>)}</SelectContent>
-        </Select>
-        <Select value={filterYear} onValueChange={setFilterYear}>
-          <SelectTrigger className="w-[100px] rounded-xl"><SelectValue /></SelectTrigger>
-          <SelectContent>{years.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent>
-        </Select>
-        <div className="ml-auto rounded-2xl border border-border bg-card px-4 py-2 shadow-apple">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+        <div className="flex items-center gap-3">
+          <Select value={filterMonth} onValueChange={setFilterMonth}>
+            <SelectTrigger className="w-[130px] rounded-xl"><SelectValue /></SelectTrigger>
+            <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={String(i)}>{m}</SelectItem>)}</SelectContent>
+          </Select>
+          <Select value={filterYear} onValueChange={setFilterYear}>
+            <SelectTrigger className="w-[90px] rounded-xl"><SelectValue /></SelectTrigger>
+            <SelectContent>{years.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+        <div className="sm:ml-auto rounded-2xl border border-border bg-card px-4 py-2 shadow-apple">
           <span className="text-xs text-muted-foreground font-medium">{t("expenses.total")}: </span>
           <span className="text-sm font-semibold">€{total.toFixed(2)}</span>
         </div>
