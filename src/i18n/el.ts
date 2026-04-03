@@ -124,6 +124,8 @@ export const el: Record<TranslationKey, string> = {
   "clients.delete": "Διαγραφή",
   "clients.firstName": "Όνομα",
   "clients.lastName": "Επώνυμο",
+  "clients.avgTicket": "Μέση Κάρτα",
+  "clients.globalAvgTicket": "Συνολική Μέση Κάρτα (Όλοι οι Πελάτες)",
 
   // Services
   "services.title": "Υπηρεσίες",

@@ -386,7 +386,7 @@ export default function ClientsPage() {
               {loadingAppts ? (
                 <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
               ) : (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                   <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-1">
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <CalendarDays className="h-4 w-4" strokeWidth={1.5} />
