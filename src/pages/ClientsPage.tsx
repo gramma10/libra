@@ -296,8 +296,8 @@ export default function ClientsPage() {
       {loading ? (
         <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
       ) : (
-        <div className="flex gap-6 min-h-[calc(100vh-12rem)]">
-          <div className="w-80 shrink-0 space-y-3">
+        <div className="flex flex-col md:flex-row gap-4 md:gap-6 min-h-[calc(100vh-12rem)]">
+          <div className="w-full md:w-80 shrink-0 space-y-3">
             <ClientFilters
               filters={filters}
               onFilterChange={setFilters}
