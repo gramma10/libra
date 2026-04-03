@@ -168,7 +168,7 @@ export default function ClientsPage() {
   }, [filtered]);
 
   const analytics = useMemo(() => {
-    if (!clientAppointments.length) return { totalAppts: 0, revenue: 0, lastVisitDays: null as number | null, noShows: 0 };
+    if (!clientAppointments.length) return { totalAppts: 0, revenue: 0, lastVisitDays: null as number | null, noShows: 0, avgTicket: 0 };
     const now = new Date();
     const validAppts = clientAppointments.filter((a) => a.status !== "Cancelled");
     const noShows = validAppts.filter((a) => a.status === "No-Show").length;
