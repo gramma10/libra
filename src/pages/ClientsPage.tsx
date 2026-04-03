@@ -300,20 +300,8 @@ export default function ClientsPage() {
             <p className="text-xl font-bold">
               €{(() => {
                 const totalRevenue = Object.values(clientRevenue).reduce((s, v) => s + v, 0);
-                const totalVisits = Object.keys(clientRevenue).reduce((s, cid) => {
-                  const lastVisit = clientLastVisit[cid];
-                  return lastVisit ? s + 1 : s;
-                }, 0);
-                // Count actual completed visits per client from appointment data
-                return totalVisits > 0 ? (totalRevenue / (() => {
-                  // We need total visit count, not unique clients
-                  let count = 0;
-                  Object.values(clientRevenue).forEach((rev, i) => {
-                    const cid = Object.keys(clientRevenue)[i];
-                    if (rev > 0) count++;
-                  });
-                  return count || 1;
-                })()).toFixed(0) : "0";
+                const totalVisits = Object.values(clientVisitCount).reduce((s, v) => s + v, 0);
+                return totalVisits > 0 ? (totalRevenue / totalVisits).toFixed(0) : "0";
               })()}
             </p>
           </div>
