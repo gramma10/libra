@@ -264,6 +264,13 @@ export const en = {
   "reports.products": "Products",
   "reports.manual": "Manual",
   "reports.commissions": "Commissions",
+  "reports.monthly": "Monthly",
+  "reports.yearly": "Yearly",
+  "reports.yearRevenue": "Year Revenue",
+  "reports.yearExpenses": "Year Expenses",
+  "reports.yearProfit": "Year Profit",
+  "reports.yearNoShows": "Year No-Shows",
+  "reports.monthlyBreakdown": "Monthly Breakdown",
 
   // My Stats
   "myStats.title": "My Stats",
