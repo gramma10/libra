@@ -266,6 +266,13 @@ export const el: Record<TranslationKey, string> = {
   "reports.products": "Προϊόντα",
   "reports.manual": "Χειροκίνητα",
   "reports.commissions": "Προμήθειες",
+  "reports.monthly": "Μηνιαία",
+  "reports.yearly": "Ετήσια",
+  "reports.yearRevenue": "Ετήσια Έσοδα",
+  "reports.yearExpenses": "Ετήσια Έξοδα",
+  "reports.yearProfit": "Ετήσιο Κέρδος",
+  "reports.yearNoShows": "Ετήσιες Μη Εμφανίσεις",
+  "reports.monthlyBreakdown": "Μηνιαία Ανάλυση",
 
   // My Stats
   "myStats.title": "Τα Στατιστικά μου",
