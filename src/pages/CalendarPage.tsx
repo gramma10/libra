@@ -112,7 +112,7 @@ export default function CalendarPage() {
           <ThreeDayView date={currentDate} staff={staff} appointments={appointments} onCellClick={handleCellClick} onAppointmentClick={(appt) => setEditingAppointment(appt)} />
         )
       ) : view === "week" ? (
-        <WeekView date={currentDate} appointments={appointments} onCellClick={handleCellClick} onAppointmentClick={(appt) => setEditingAppointment(appt)} />
+        <WeekView date={currentDate} staff={staff} appointments={appointments} onCellClick={handleCellClick} onAppointmentClick={(appt) => setEditingAppointment(appt)} />
       ) : (
         <MonthView date={currentDate} appointments={appointments} onDayClick={(day) => { setCurrentDate(day); setView("day"); }} />
       )}
