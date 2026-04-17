@@ -28,6 +28,7 @@ export const en = {
   // Calendar
   "calendar.title": "Calendar",
   "calendar.day": "day",
+  "calendar.threeDay": "3 days",
   "calendar.week": "week",
   "calendar.month": "month",
   "calendar.today": "Today",

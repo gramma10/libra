@@ -1,9 +1,8 @@
 import { useRef, useEffect } from "react";
-import { Bell } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 
 const HOURS = Array.from({ length: 14 }, (_, i) => i + 7);
-const HOUR_HEIGHT = 56;
+const HOUR_HEIGHT = 60;
 
 const getWeekDays = (date: Date) => {
   const start = new Date(date);
@@ -19,9 +18,10 @@ interface WeekViewProps {
   date: Date;
   appointments: any[];
   onCellClick: (staffId: string, hour: number, minutes: number, day?: Date) => void;
+  onAppointmentClick?: (appointment: any) => void;
 }
 
-export default function WeekView({ date, appointments, onCellClick }: WeekViewProps) {
+export default function WeekView({ date, appointments, onCellClick, onAppointmentClick }: WeekViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { locale } = useLanguage();
   const days = getWeekDays(date);
@@ -36,6 +36,45 @@ export default function WeekView({ date, appointments, onCellClick }: WeekViewPr
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
   }, [date]);
 
+  // Group overlapping appointments per day for clean layout
+  const layoutDayAppointments = (dayAppts: any[]) => {
+    const sorted = [...dayAppts].sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+    const columns: any[][] = [];
+    const placements: { appt: any; col: number; totalCols: number }[] = [];
+
+    sorted.forEach((appt) => {
+      const start = new Date(appt.start_time).getTime();
+      const end = new Date(appt.end_time).getTime();
+      let placed = false;
+      for (let i = 0; i < columns.length; i++) {
+        const last = columns[i][columns[i].length - 1];
+        if (new Date(last.end_time).getTime() <= start) {
+          columns[i].push(appt);
+          placements.push({ appt, col: i, totalCols: 0 });
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        columns.push([appt]);
+        placements.push({ appt, col: columns.length - 1, totalCols: 0 });
+      }
+    });
+
+    // Compute total columns each appt overlaps with
+    return placements.map((p) => {
+      const start = new Date(p.appt.start_time).getTime();
+      const end = new Date(p.appt.end_time).getTime();
+      const overlapping = sorted.filter((o) => {
+        const os = new Date(o.start_time).getTime();
+        const oe = new Date(o.end_time).getTime();
+        return os < end && oe > start;
+      });
+      const cols = new Set(overlapping.map((o) => placements.find((x) => x.appt.id === o.id)!.col));
+      return { ...p, totalCols: Math.max(cols.size, 1) };
+    });
+  };
+
   return (
     <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
       <div className="flex border-b border-border bg-muted/30 flex-shrink-0">
@@ -43,9 +82,9 @@ export default function WeekView({ date, appointments, onCellClick }: WeekViewPr
         {days.map((d) => {
           const isToday = d.toDateString() === today.toDateString();
           return (
-            <div key={d.toISOString()} className="flex-1 min-w-[100px] px-2 py-2.5 text-center border-r border-border last:border-r-0">
-              <span className="text-[10px] text-muted-foreground uppercase">{d.toLocaleDateString(locale, { weekday: "short" })}</span>
-              <div className={`text-lg font-semibold mt-0.5 ${isToday ? "text-primary" : "text-foreground"}`}>
+            <div key={d.toISOString()} className="flex-1 min-w-[90px] px-2 py-2.5 text-center border-r border-border last:border-r-0">
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wide">{d.toLocaleDateString(locale, { weekday: "short" })}</span>
+              <div className={`text-base font-semibold mt-0.5 ${isToday ? "text-primary" : "text-foreground"}`}>
                 {d.getDate()}
               </div>
             </div>
@@ -61,7 +100,7 @@ export default function WeekView({ date, appointments, onCellClick }: WeekViewPr
                 <span className="text-[11px] text-muted-foreground font-medium">{formatHour(hour)}</span>
               </div>
               {days.map((d) => (
-                <div key={d.toISOString()} className="flex-1 min-w-[100px] border-r border-border/30 last:border-r-0 relative">
+                <div key={d.toISOString()} className="flex-1 min-w-[90px] border-r border-border/30 last:border-r-0 relative">
                   <div className="absolute inset-x-0 top-0 h-1/2 cursor-pointer hover:bg-primary/5 transition-colors border-b border-dashed border-border/20" onClick={() => onCellClick("", hour, 0, d)} />
                   <div className="absolute inset-x-0 bottom-0 h-1/2 cursor-pointer hover:bg-primary/5 transition-colors" onClick={() => onCellClick("", hour, 30, d)} />
                 </div>
@@ -72,20 +111,27 @@ export default function WeekView({ date, appointments, onCellClick }: WeekViewPr
           {days.map((day, colIndex) => {
             const dayStr = day.toDateString();
             const dayAppts = appointments.filter((a: any) => new Date(a.start_time).toDateString() === dayStr);
-            return dayAppts.map((appt: any) => {
+            const placed = layoutDayAppointments(dayAppts);
+            return placed.map(({ appt, col, totalCols }) => {
               const start = new Date(appt.start_time);
               const end = new Date(appt.end_time);
               const topOffset = (start.getHours() + start.getMinutes() / 60 - HOURS[0]) * HOUR_HEIGHT;
               const height = ((end.getTime() - start.getTime()) / 3600000) * HOUR_HEIGHT;
-              const color = appt.services?.category_color || "#6366f1";
+              const isNoShow = appt.status === "No-Show";
+              const color = isNoShow ? "hsl(0 0% 60%)" : (appt.services?.category_color || "#6366f1");
               return (
-                <div key={appt.id} className="absolute rounded-lg p-1.5 cursor-pointer transition-all hover:shadow-lg text-white z-10 overflow-hidden"
+                <div
+                  key={appt.id}
+                  onClick={() => onAppointmentClick?.(appt)}
+                  className={`absolute rounded-lg p-1.5 cursor-pointer transition-all hover:shadow-lg text-white z-10 overflow-hidden ${isNoShow ? "opacity-60" : "hover:brightness-110"}`}
                   style={{
-                    top: `${topOffset + 1}px`, height: `${Math.max(height - 2, 20)}px`,
-                    left: `calc(64px + (100% - 64px) * ${colIndex} / 7 + 2px)`,
-                    width: `calc((100% - 64px) / 7 - 4px)`,
+                    top: `${topOffset + 1}px`,
+                    height: `${Math.max(height - 2, 22)}px`,
+                    left: `calc(64px + (100% - 64px) * ${colIndex} / 7 + (100% - 64px) / 7 * ${col} / ${totalCols} + 1px)`,
+                    width: `calc((100% - 64px) / 7 / ${totalCols} - 2px)`,
                     backgroundColor: color,
-                  }}>
+                  }}
+                >
                   <p className="text-[10px] font-semibold leading-tight truncate">{appt.clients?.first_name} {appt.clients?.last_name}</p>
                   {height > 28 && <p className="text-[9px] opacity-80 truncate">{appt.services?.service_name}</p>}
                 </div>
