@@ -1,6 +1,7 @@
 import { useRef, useEffect } from "react";
 import { Bell } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useAppointmentDragDrop } from "@/hooks/useAppointmentDragDrop";
 
 const HOURS = Array.from({ length: 14 }, (_, i) => i + 7);
 const HOUR_HEIGHT = 60;
