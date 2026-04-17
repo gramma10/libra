@@ -1,6 +1,7 @@
 import { useRef, useEffect } from "react";
 import { Bell } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useAppointmentDragDrop } from "@/hooks/useAppointmentDragDrop";
 
 const HOURS = Array.from({ length: 14 }, (_, i) => i + 7);
 const HOUR_HEIGHT = 60;
@@ -16,11 +17,13 @@ interface ThreeDayViewProps {
   appointments: any[];
   onCellClick: (staffId: string, hour: number, minutes: number, day?: Date) => void;
   onAppointmentClick?: (appointment: any) => void;
+  onUpdated?: () => void;
 }
 
-export default function ThreeDayView({ date, staff, appointments, onCellClick, onAppointmentClick }: ThreeDayViewProps) {
+export default function ThreeDayView({ date, staff, appointments, onCellClick, onAppointmentClick, onUpdated }: ThreeDayViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { locale } = useLanguage();
+  const { draggingAppt, dragOverKey, handleDragStart, handleDragEnd, handleDragOver, handleDrop } = useAppointmentDragDrop(() => onUpdated?.());
   const today = new Date();
 
   const days = Array.from({ length: 3 }, (_, i) => {
