@@ -6,6 +6,7 @@ import { useShop } from "@/hooks/useShop";
 import CalendarHeader, { CalendarView } from "@/components/calendar/CalendarHeader";
 import DayView from "@/components/calendar/DayView";
 import WeekView from "@/components/calendar/WeekView";
+import ThreeDayView from "@/components/calendar/ThreeDayView";
 import MonthView from "@/components/calendar/MonthView";
 import NewBookingDialog from "@/components/calendar/NewBookingDialog";
 import EditBookingDialog from "@/components/calendar/EditBookingDialog";
@@ -32,6 +33,11 @@ export default function CalendarPage() {
     if (view === "day") {
       const start = new Date(currentDate); start.setHours(0, 0, 0, 0);
       const end = new Date(currentDate); end.setHours(23, 59, 59, 999);
+      return { start, end };
+    }
+    if (view === "3day") {
+      const start = new Date(currentDate); start.setHours(0, 0, 0, 0);
+      const end = new Date(currentDate); end.setDate(end.getDate() + 2); end.setHours(23, 59, 59, 999);
       return { start, end };
     }
     if (view === "week") {
@@ -65,6 +71,7 @@ export default function CalendarPage() {
   const navigate = (dir: number) => {
     const d = new Date(currentDate);
     if (view === "day") d.setDate(d.getDate() + dir);
+    else if (view === "3day") d.setDate(d.getDate() + dir * 3);
     else if (view === "week") d.setDate(d.getDate() + dir * 7);
     else d.setMonth(d.getMonth() + dir);
     setCurrentDate(d);
@@ -98,8 +105,14 @@ export default function CalendarPage() {
         ) : (
           <DayView date={currentDate} staff={staff} appointments={appointments} onCellClick={handleCellClick} onAppointmentClick={(appt) => setEditingAppointment(appt)} />
         )
+      ) : view === "3day" ? (
+        staff.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center"><p className="text-muted-foreground text-sm">{t("calendar.addEmployeesFirst")}</p></div>
+        ) : (
+          <ThreeDayView date={currentDate} staff={staff} appointments={appointments} onCellClick={handleCellClick} onAppointmentClick={(appt) => setEditingAppointment(appt)} />
+        )
       ) : view === "week" ? (
-        <WeekView date={currentDate} appointments={appointments} onCellClick={handleCellClick} />
+        <WeekView date={currentDate} appointments={appointments} onCellClick={handleCellClick} onAppointmentClick={(appt) => setEditingAppointment(appt)} />
       ) : (
         <MonthView date={currentDate} appointments={appointments} onDayClick={(day) => { setCurrentDate(day); setView("day"); }} />
       )}
