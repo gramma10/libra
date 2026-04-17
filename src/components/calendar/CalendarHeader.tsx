@@ -2,7 +2,7 @@ import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/useLanguage";
 
-export type CalendarView = "day" | "week" | "month";
+export type CalendarView = "day" | "3day" | "week" | "month";
 
 interface CalendarHeaderProps {
   currentDate: Date;
@@ -25,11 +25,17 @@ export default function CalendarHeader({ currentDate, view, onViewChange, onNavi
       end.setDate(end.getDate() + 6);
       return `${start.toLocaleDateString(locale, { month: "short", day: "numeric" })} – ${end.toLocaleDateString(locale, { month: "short", day: "numeric", year: "numeric" })}`;
     }
+    if (v === "3day") {
+      const end = new Date(d);
+      end.setDate(end.getDate() + 2);
+      return `${d.toLocaleDateString(locale, { month: "short", day: "numeric" })} – ${end.toLocaleDateString(locale, { month: "short", day: "numeric", year: "numeric" })}`;
+    }
     return d.toLocaleDateString(locale, { weekday: "long", month: "long", day: "numeric" });
   };
 
   const viewLabels: Record<CalendarView, string> = {
     day: t("calendar.day"),
+    "3day": t("calendar.threeDay"),
     week: t("calendar.week"),
     month: t("calendar.month"),
   };
@@ -42,7 +48,7 @@ export default function CalendarHeader({ currentDate, view, onViewChange, onNavi
       </div>
       <div className="flex items-center gap-2 flex-wrap">
         <div className="flex rounded-xl border border-border overflow-hidden">
-          {(["day", "week", "month"] as CalendarView[]).map((v) => (
+          {(["day", "3day", "week", "month"] as CalendarView[]).map((v) => (
             <button
               key={v}
               onClick={() => onViewChange(v)}

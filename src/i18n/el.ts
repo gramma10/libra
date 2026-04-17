@@ -30,6 +30,7 @@ export const el: Record<TranslationKey, string> = {
   // Calendar
   "calendar.title": "Ημερολόγιο",
   "calendar.day": "ημέρα",
+  "calendar.threeDay": "3 ημέρες",
   "calendar.week": "εβδομάδα",
   "calendar.month": "μήνας",
   "calendar.today": "Σήμερα",
