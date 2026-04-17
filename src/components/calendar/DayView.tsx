@@ -1,6 +1,7 @@
 import { useRef, useEffect } from "react";
 import { Bell } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useAppointmentDragDrop } from "@/hooks/useAppointmentDragDrop";
 
 const HOURS = Array.from({ length: 14 }, (_, i) => i + 7);
 const HOUR_HEIGHT = 64;
@@ -16,11 +17,13 @@ interface DayViewProps {
   appointments: any[];
   onCellClick: (staffId: string, hour: number, minutes: number) => void;
   onAppointmentClick?: (appointment: any) => void;
+  onUpdated?: () => void;
 }
 
-export default function DayView({ date, staff, appointments, onCellClick, onAppointmentClick }: DayViewProps) {
+export default function DayView({ date, staff, appointments, onCellClick, onAppointmentClick, onUpdated }: DayViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { locale } = useLanguage();
+  const { draggingAppt, dragOverKey, handleDragStart, handleDragEnd, handleDragOver, handleDrop } = useAppointmentDragDrop(() => onUpdated?.());
 
   const formatHour = (h: number) => {
     if (locale === "el-GR") return `${h}:00`;
@@ -55,12 +58,26 @@ export default function DayView({ date, staff, appointments, onCellClick, onAppo
               <div className="w-16 flex-shrink-0 border-r border-border flex items-start justify-end pr-2 pt-1">
                 <span className="text-[11px] text-muted-foreground font-medium">{formatHour(hour)}</span>
               </div>
-              {staff.map((s) => (
-                <div key={s.id} className="flex-1 min-w-[140px] border-r border-border/30 last:border-r-0 relative">
-                  <div className="absolute inset-x-0 top-0 h-1/2 cursor-pointer hover:bg-primary/5 transition-colors border-b border-dashed border-border/20" onClick={() => onCellClick(s.id, hour, 0)} />
-                  <div className="absolute inset-x-0 bottom-0 h-1/2 cursor-pointer hover:bg-primary/5 transition-colors" onClick={() => onCellClick(s.id, hour, 30)} />
-                </div>
-              ))}
+              {staff.map((s) => {
+                const topKey = `${s.id}-${hour}-0`;
+                const bottomKey = `${s.id}-${hour}-30`;
+                return (
+                  <div key={s.id} className="flex-1 min-w-[140px] border-r border-border/30 last:border-r-0 relative">
+                    <div
+                      className={`absolute inset-x-0 top-0 h-1/2 cursor-pointer hover:bg-primary/5 transition-colors border-b border-dashed border-border/20 ${dragOverKey === topKey ? "bg-primary/15" : ""}`}
+                      onClick={() => onCellClick(s.id, hour, 0)}
+                      onDragOver={(e) => handleDragOver(e, topKey)}
+                      onDrop={(e) => handleDrop(e, { staffId: s.id, hour, minutes: 0, day: date })}
+                    />
+                    <div
+                      className={`absolute inset-x-0 bottom-0 h-1/2 cursor-pointer hover:bg-primary/5 transition-colors ${dragOverKey === bottomKey ? "bg-primary/15" : ""}`}
+                      onClick={() => onCellClick(s.id, hour, 30)}
+                      onDragOver={(e) => handleDragOver(e, bottomKey)}
+                      onDrop={(e) => handleDrop(e, { staffId: s.id, hour, minutes: 30, day: date })}
+                    />
+                  </div>
+                );
+              })}
             </div>
           ))}
 
@@ -74,7 +91,13 @@ export default function DayView({ date, staff, appointments, onCellClick, onAppo
               const isNoShow = appt.status === "No-Show";
               const color = isNoShow ? "hsl(0 0% 60%)" : (appt.services?.category_color || "#6366f1");
               return (
-                <div key={appt.id} onClick={() => onAppointmentClick?.(appt)} className={`absolute rounded-lg p-2 cursor-pointer transition-all hover:shadow-lg z-10 overflow-hidden ${isNoShow ? "opacity-60" : "hover:brightness-110"} text-white`}
+                <div
+                  key={appt.id}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, appt)}
+                  onDragEnd={handleDragEnd}
+                  onClick={() => onAppointmentClick?.(appt)}
+                  className={`absolute rounded-lg p-2 cursor-grab active:cursor-grabbing transition-all hover:shadow-lg z-10 overflow-hidden ${isNoShow ? "opacity-60" : "hover:brightness-110"} ${draggingAppt?.id === appt.id ? "opacity-40" : ""} text-white`}
                   style={{
                     top: `${topOffset + 1}px`, height: `${Math.max(height - 2, 24)}px`,
                     left: `calc(64px + (100% - 64px) * ${colIndex} / ${staff.length} + 3px)`,
