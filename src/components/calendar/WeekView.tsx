@@ -28,11 +28,13 @@ interface WeekViewProps {
   appointments: any[];
   onCellClick: (staffId: string, hour: number, minutes: number, day?: Date) => void;
   onAppointmentClick?: (appointment: any) => void;
+  onUpdated?: () => void;
 }
 
-export default function WeekView({ date, staff, appointments, onCellClick, onAppointmentClick }: WeekViewProps) {
+export default function WeekView({ date, staff, appointments, onCellClick, onAppointmentClick, onUpdated }: WeekViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { locale } = useLanguage();
+  const { draggingAppt, dragOverKey, handleDragStart, handleDragEnd, handleDragOver, handleDrop } = useAppointmentDragDrop(() => onUpdated?.());
   const today = new Date();
   const days = getWeekDays(date);
 
