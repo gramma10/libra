@@ -1,6 +1,7 @@
 import { useRef, useEffect } from "react";
 import { Bell } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useAppointmentDragDrop } from "@/hooks/useAppointmentDragDrop";
 
 const HOURS = Array.from({ length: 14 }, (_, i) => i + 7);
 const HOUR_HEIGHT = 60;
@@ -16,11 +17,13 @@ interface ThreeDayViewProps {
   appointments: any[];
   onCellClick: (staffId: string, hour: number, minutes: number, day?: Date) => void;
   onAppointmentClick?: (appointment: any) => void;
+  onUpdated?: () => void;
 }
 
-export default function ThreeDayView({ date, staff, appointments, onCellClick, onAppointmentClick }: ThreeDayViewProps) {
+export default function ThreeDayView({ date, staff, appointments, onCellClick, onAppointmentClick, onUpdated }: ThreeDayViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { locale } = useLanguage();
+  const { draggingAppt, dragOverKey, handleDragStart, handleDragEnd, handleDragOver, handleDrop } = useAppointmentDragDrop(() => onUpdated?.());
   const today = new Date();
 
   const days = Array.from({ length: 3 }, (_, i) => {
@@ -107,22 +110,30 @@ export default function ThreeDayView({ date, staff, appointments, onCellClick, o
                     className={`flex-1 flex ${dayIdx < days.length - 1 ? "border-r-2 border-border" : ""}`}
                     style={{ minWidth: `${staffCount * STAFF_COL_WIDTH}px` }}
                   >
-                    {staff.map((s) => (
-                      <div
-                        key={s.id}
-                        className="flex-1 border-r border-border/30 last:border-r-0 relative"
-                        style={{ minWidth: `${STAFF_COL_WIDTH}px` }}
-                      >
+                    {staff.map((s) => {
+                      const topKey = `${d.toDateString()}-${s.id}-${hour}-0`;
+                      const bottomKey = `${d.toDateString()}-${s.id}-${hour}-30`;
+                      return (
                         <div
-                          className="absolute inset-x-0 top-0 h-1/2 cursor-pointer hover:bg-primary/5 transition-colors border-b border-dashed border-border/20"
-                          onClick={() => onCellClick(s.id, hour, 0, d)}
-                        />
-                        <div
-                          className="absolute inset-x-0 bottom-0 h-1/2 cursor-pointer hover:bg-primary/5 transition-colors"
-                          onClick={() => onCellClick(s.id, hour, 30, d)}
-                        />
-                      </div>
-                    ))}
+                          key={s.id}
+                          className="flex-1 border-r border-border/30 last:border-r-0 relative"
+                          style={{ minWidth: `${STAFF_COL_WIDTH}px` }}
+                        >
+                          <div
+                            className={`absolute inset-x-0 top-0 h-1/2 cursor-pointer hover:bg-primary/5 transition-colors border-b border-dashed border-border/20 ${dragOverKey === topKey ? "bg-primary/15" : ""}`}
+                            onClick={() => onCellClick(s.id, hour, 0, d)}
+                            onDragOver={(e) => handleDragOver(e, topKey)}
+                            onDrop={(e) => handleDrop(e, { staffId: s.id, hour, minutes: 0, day: d })}
+                          />
+                          <div
+                            className={`absolute inset-x-0 bottom-0 h-1/2 cursor-pointer hover:bg-primary/5 transition-colors ${dragOverKey === bottomKey ? "bg-primary/15" : ""}`}
+                            onClick={() => onCellClick(s.id, hour, 30, d)}
+                            onDragOver={(e) => handleDragOver(e, bottomKey)}
+                            onDrop={(e) => handleDrop(e, { staffId: s.id, hour, minutes: 30, day: d })}
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
                 ))}
               </div>
@@ -147,8 +158,11 @@ export default function ThreeDayView({ date, staff, appointments, onCellClick, o
                   return (
                     <div
                       key={appt.id}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, appt)}
+                      onDragEnd={handleDragEnd}
                       onClick={() => onAppointmentClick?.(appt)}
-                      className={`absolute rounded-lg p-1 cursor-pointer transition-all hover:shadow-lg z-10 overflow-hidden text-white ${isNoShow ? "opacity-60" : "hover:brightness-110"}`}
+                      className={`absolute rounded-lg p-1 cursor-grab active:cursor-grabbing transition-all hover:shadow-lg z-10 overflow-hidden text-white ${isNoShow ? "opacity-60" : "hover:brightness-110"} ${draggingAppt?.id === appt.id ? "opacity-40" : ""}`}
                       style={{
                         top: `${topOffset + 1}px`,
                         height: `${Math.max(height - 2, 22)}px`,

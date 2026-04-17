@@ -103,16 +103,16 @@ export default function CalendarPage() {
         staff.length === 0 ? (
           <div className="flex-1 flex items-center justify-center"><p className="text-muted-foreground text-sm">{t("calendar.addEmployeesFirst")}</p></div>
         ) : (
-          <DayView date={currentDate} staff={staff} appointments={appointments} onCellClick={handleCellClick} onAppointmentClick={(appt) => setEditingAppointment(appt)} />
+          <DayView date={currentDate} staff={staff} appointments={appointments} onCellClick={handleCellClick} onAppointmentClick={(appt) => setEditingAppointment(appt)} onUpdated={fetchData} />
         )
       ) : view === "3day" ? (
         staff.length === 0 ? (
           <div className="flex-1 flex items-center justify-center"><p className="text-muted-foreground text-sm">{t("calendar.addEmployeesFirst")}</p></div>
         ) : (
-          <ThreeDayView date={currentDate} staff={staff} appointments={appointments} onCellClick={handleCellClick} onAppointmentClick={(appt) => setEditingAppointment(appt)} />
+          <ThreeDayView date={currentDate} staff={staff} appointments={appointments} onCellClick={handleCellClick} onAppointmentClick={(appt) => setEditingAppointment(appt)} onUpdated={fetchData} />
         )
       ) : view === "week" ? (
-        <WeekView date={currentDate} staff={staff} appointments={appointments} onCellClick={handleCellClick} onAppointmentClick={(appt) => setEditingAppointment(appt)} />
+        <WeekView date={currentDate} staff={staff} appointments={appointments} onCellClick={handleCellClick} onAppointmentClick={(appt) => setEditingAppointment(appt)} onUpdated={fetchData} />
       ) : (
         <MonthView date={currentDate} appointments={appointments} onDayClick={(day) => { setCurrentDate(day); setView("day"); }} />
       )}
