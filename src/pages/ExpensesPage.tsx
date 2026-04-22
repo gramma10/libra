@@ -21,9 +21,14 @@ export type Expense = {
   recurrence_interval?: string; recurrence_parent_id?: string | null;
 };
 
-// Generate any missing recurring occurrences for a given month from active recurring templates
-async function generateRecurringForMonth(shopId: string, year: number, month: number) {
-  // Templates = expenses with recurrence_interval != 'none' AND no parent (originals)
+// Generate any missing recurring occurrences for a given month from active recurring templates.
+// Returns the number of inserted occurrences.
+async function generateRecurringForMonth(
+  shopId: string,
+  year: number,
+  month: number,
+  opts: { includePast?: boolean } = {}
+): Promise<number> {
   const { data: templates } = await supabase
     .from("expenses" as any)
     .select("*")
@@ -31,10 +36,16 @@ async function generateRecurringForMonth(shopId: string, year: number, month: nu
     .neq("recurrence_interval", "none")
     .is("recurrence_parent_id", null);
 
-  if (!templates || templates.length === 0) return;
+  if (!templates || templates.length === 0) return 0;
 
   const monthStart = new Date(year, month, 1);
   const monthEnd = new Date(year, month + 1, 0);
+  const today = new Date();
+  const targetIsPast =
+    year < today.getFullYear() || (year === today.getFullYear() && month < today.getMonth());
+
+  // Without explicit backfill, do not generate occurrences for months in the past
+  if (targetIsPast && !opts.includePast) return 0;
 
   const toInsert: any[] = [];
 
@@ -43,18 +54,15 @@ async function generateRecurringForMonth(shopId: string, year: number, month: nu
     if (!interval) continue;
 
     const tplDate = new Date(tpl.date + "T00:00:00");
-    if (tplDate > monthEnd) continue; // future template
+    if (tplDate > monthEnd) continue; // template starts after this month
 
-    // Compute the occurrence date for this month based on interval
     const monthsDiff = (year - tplDate.getFullYear()) * 12 + (month - tplDate.getMonth());
     if (monthsDiff <= 0 || monthsDiff % interval !== 0) continue;
 
-    // Anchor day = template day, clamped to last day of target month
     const lastDay = monthEnd.getDate();
     const day = Math.min(tplDate.getDate(), lastDay);
     const occDate = new Date(year, month, day).toISOString().split("T")[0];
 
-    // Check if already exists for this template in this month
     const { data: existing } = await supabase
       .from("expenses" as any)
       .select("id")
@@ -80,6 +88,7 @@ async function generateRecurringForMonth(shopId: string, year: number, month: nu
   if (toInsert.length > 0) {
     await supabase.from("expenses" as any).insert(toInsert);
   }
+  return toInsert.length;
 }
 
 export default function ExpensesPage() {
