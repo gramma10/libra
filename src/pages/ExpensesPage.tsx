@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Plus, Pencil, Trash2, Loader2, Receipt, Repeat } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Receipt, Repeat, History } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -21,9 +21,14 @@ export type Expense = {
   recurrence_interval?: string; recurrence_parent_id?: string | null;
 };
 
-// Generate any missing recurring occurrences for a given month from active recurring templates
-async function generateRecurringForMonth(shopId: string, year: number, month: number) {
-  // Templates = expenses with recurrence_interval != 'none' AND no parent (originals)
+// Generate any missing recurring occurrences for a given month from active recurring templates.
+// Returns the number of inserted occurrences.
+async function generateRecurringForMonth(
+  shopId: string,
+  year: number,
+  month: number,
+  opts: { includePast?: boolean } = {}
+): Promise<number> {
   const { data: templates } = await supabase
     .from("expenses" as any)
     .select("*")
@@ -31,10 +36,16 @@ async function generateRecurringForMonth(shopId: string, year: number, month: nu
     .neq("recurrence_interval", "none")
     .is("recurrence_parent_id", null);
 
-  if (!templates || templates.length === 0) return;
+  if (!templates || templates.length === 0) return 0;
 
   const monthStart = new Date(year, month, 1);
   const monthEnd = new Date(year, month + 1, 0);
+  const today = new Date();
+  const targetIsPast =
+    year < today.getFullYear() || (year === today.getFullYear() && month < today.getMonth());
+
+  // Without explicit backfill, do not generate occurrences for months in the past
+  if (targetIsPast && !opts.includePast) return 0;
 
   const toInsert: any[] = [];
 
@@ -43,18 +54,15 @@ async function generateRecurringForMonth(shopId: string, year: number, month: nu
     if (!interval) continue;
 
     const tplDate = new Date(tpl.date + "T00:00:00");
-    if (tplDate > monthEnd) continue; // future template
+    if (tplDate > monthEnd) continue; // template starts after this month
 
-    // Compute the occurrence date for this month based on interval
     const monthsDiff = (year - tplDate.getFullYear()) * 12 + (month - tplDate.getMonth());
     if (monthsDiff <= 0 || monthsDiff % interval !== 0) continue;
 
-    // Anchor day = template day, clamped to last day of target month
     const lastDay = monthEnd.getDate();
     const day = Math.min(tplDate.getDate(), lastDay);
     const occDate = new Date(year, month, day).toISOString().split("T")[0];
 
-    // Check if already exists for this template in this month
     const { data: existing } = await supabase
       .from("expenses" as any)
       .select("id")
@@ -80,6 +88,7 @@ async function generateRecurringForMonth(shopId: string, year: number, month: nu
   if (toInsert.length > 0) {
     await supabase.from("expenses" as any).insert(toInsert);
   }
+  return toInsert.length;
 }
 
 export default function ExpensesPage() {
@@ -91,6 +100,12 @@ export default function ExpensesPage() {
   const [editing, setEditing] = useState<Expense | null>(null);
   const [filterMonth, setFilterMonth] = useState(String(new Date().getMonth()));
   const [filterYear, setFilterYear] = useState(String(new Date().getFullYear()));
+  const [backfilling, setBackfilling] = useState(false);
+
+  const today = new Date();
+  const isPastMonth =
+    Number(filterYear) < today.getFullYear() ||
+    (Number(filterYear) === today.getFullYear() && Number(filterMonth) < today.getMonth());
 
   const MONTHS = Array.from({ length: 12 }, (_, i) =>
     new Date(2000, i).toLocaleString(locale, { month: "long" })
@@ -126,6 +141,24 @@ export default function ExpensesPage() {
   const handleEdit = (exp: Expense) => { setEditing(exp); setDialogOpen(true); };
   const handleNew = () => { setEditing(null); setDialogOpen(true); };
 
+  const handleBackfill = async () => {
+    if (!shopId) return;
+    setBackfilling(true);
+    const count = await generateRecurringForMonth(
+      shopId,
+      Number(filterYear),
+      Number(filterMonth),
+      { includePast: true }
+    );
+    setBackfilling(false);
+    if (count > 0) {
+      toast.success(t("expenses.generated").replace("{count}", String(count)));
+      fetchExpenses();
+    } else {
+      toast.info(t("expenses.noneMissing"));
+    }
+  };
+
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 5 }, (_, i) => String(currentYear - 2 + i));
   const total = expenses.reduce((s, e) => s + Number(e.amount), 0);
@@ -158,6 +191,22 @@ export default function ExpensesPage() {
             <SelectContent>{years.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent>
           </Select>
         </div>
+        {isPastMonth && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleBackfill}
+            disabled={backfilling}
+            className="rounded-xl gap-2"
+          >
+            {backfilling ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <History className="h-3.5 w-3.5" />
+            )}
+            {backfilling ? t("expenses.generating") : t("expenses.generateMissed")}
+          </Button>
+        )}
         <div className="sm:ml-auto rounded-2xl border border-border bg-card px-4 py-2 shadow-apple">
           <span className="text-xs text-muted-foreground font-medium">{t("expenses.total")}: </span>
           <span className="text-sm font-semibold">€{total.toFixed(2)}</span>

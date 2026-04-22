@@ -266,6 +266,10 @@ export const el: Record<TranslationKey, string> = {
   "expenses.scopeThis": "Μόνο αυτόν τον μήνα",
   "expenses.scopeFuture": "Αυτόν και όλους τους επόμενους μήνες",
   "expenses.scopeHint": "Επίλεξε αν το νέο ποσό θα επηρεάσει μόνο αυτή την εμφάνιση ή και τις μελλοντικές.",
+  "expenses.generateMissed": "Δημιουργία χαμένων",
+  "expenses.generated": "Δημιουργήθηκαν {count} έξοδα που έλειπαν",
+  "expenses.noneMissing": "Δεν λείπει κανένα επαναλαμβανόμενο έξοδο για αυτόν τον μήνα",
+  "expenses.generating": "Δημιουργία…",
 
   // Reports
   "reports.title": "Αναλυτικά",
