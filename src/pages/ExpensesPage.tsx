@@ -100,6 +100,12 @@ export default function ExpensesPage() {
   const [editing, setEditing] = useState<Expense | null>(null);
   const [filterMonth, setFilterMonth] = useState(String(new Date().getMonth()));
   const [filterYear, setFilterYear] = useState(String(new Date().getFullYear()));
+  const [backfilling, setBackfilling] = useState(false);
+
+  const today = new Date();
+  const isPastMonth =
+    Number(filterYear) < today.getFullYear() ||
+    (Number(filterYear) === today.getFullYear() && Number(filterMonth) < today.getMonth());
 
   const MONTHS = Array.from({ length: 12 }, (_, i) =>
     new Date(2000, i).toLocaleString(locale, { month: "long" })
@@ -167,6 +173,22 @@ export default function ExpensesPage() {
             <SelectContent>{years.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent>
           </Select>
         </div>
+        {isPastMonth && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleBackfill}
+            disabled={backfilling}
+            className="rounded-xl gap-2"
+          >
+            {backfilling ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <History className="h-3.5 w-3.5" />
+            )}
+            {backfilling ? t("expenses.generating") : t("expenses.generateMissed")}
+          </Button>
+        )}
         <div className="sm:ml-auto rounded-2xl border border-border bg-card px-4 py-2 shadow-apple">
           <span className="text-xs text-muted-foreground font-medium">{t("expenses.total")}: </span>
           <span className="text-sm font-semibold">€{total.toFixed(2)}</span>
