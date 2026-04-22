@@ -262,6 +262,10 @@ export const el: Record<TranslationKey, string> = {
   "expenses.recurrenceHint": "Οι μελλοντικοί μήνες θα δημιουργούνται αυτόματα. Μπορείς να αλλάξεις το ποσό σε κάθε έναν.",
   "expenses.occurrenceHint": "Αυτή είναι επαναλαμβανόμενη εμφάνιση — άλλαξε την επανάληψη στο αρχικό έξοδο.",
   "expenses.recurringBadge": "Επαναλαμβανόμενο",
+  "expenses.applyScope": "Εφαρμογή αλλαγής ποσού σε",
+  "expenses.scopeThis": "Μόνο αυτόν τον μήνα",
+  "expenses.scopeFuture": "Αυτόν και όλους τους επόμενους μήνες",
+  "expenses.scopeHint": "Επίλεξε αν το νέο ποσό θα επηρεάσει μόνο αυτή την εμφάνιση ή και τις μελλοντικές.",
 
   // Reports
   "reports.title": "Αναλυτικά",
