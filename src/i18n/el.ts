@@ -76,6 +76,12 @@ export const el: Record<TranslationKey, string> = {
   "editBooking.updated": "Το ραντεβού ενημερώθηκε",
   "editBooking.deleted": "Το ραντεβού διαγράφηκε",
   "editBooking.viewOnly": "Μπορείτε μόνο να δείτε αυτό το ραντεβού. Η επεξεργασία περιορίζεται στα δικά σας.",
+  "editBooking.mainService": "Κύρια Υπηρεσία",
+  "editBooking.additionalServices": "Επιπλέον Υπηρεσίες",
+  "editBooking.addService": "Προσθήκη υπηρεσίας",
+  "editBooking.totalDuration": "Συνολική διάρκεια",
+  "editBooking.totalPrice": "Συνολικό κόστος",
+  "editBooking.removeService": "Αφαίρεση",
 
   // Clients
   "clients.title": "Πελάτες",

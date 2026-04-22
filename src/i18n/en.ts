@@ -74,6 +74,12 @@ export const en = {
   "editBooking.updated": "Appointment updated",
   "editBooking.deleted": "Appointment deleted",
   "editBooking.viewOnly": "You can only view this appointment. Edit is restricted to your own appointments.",
+  "editBooking.mainService": "Main Service",
+  "editBooking.additionalServices": "Additional Services",
+  "editBooking.addService": "Add service",
+  "editBooking.totalDuration": "Total duration",
+  "editBooking.totalPrice": "Total price",
+  "editBooking.removeService": "Remove",
 
   // Clients
   "clients.title": "Clients",

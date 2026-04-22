@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Loader2, Trash2, Bell, BellOff, Phone, Mail } from "lucide-react";
+import { Loader2, Trash2, Bell, BellOff, Phone, Mail, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,6 +19,11 @@ interface EditBookingDialogProps {
   onUpdated: () => void;
 }
 
+interface ExtraServiceRow {
+  id?: string; // existing row id
+  service_id: string;
+}
+
 export default function EditBookingDialog({ open, onOpenChange, appointment, services, staff, onUpdated }: EditBookingDialogProps) {
   const { isAdmin, isManager, isStaff, staffRecordId } = useRole();
   const { t } = useLanguage();
@@ -30,9 +35,11 @@ export default function EditBookingDialog({ open, onOpenChange, appointment, ser
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [extraServices, setExtraServices] = useState<ExtraServiceRow[]>([]);
+  const [originalExtras, setOriginalExtras] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!appointment) return;
+    if (!appointment || !open) return;
     setServiceId(appointment.service_id || "");
     setStaffId(appointment.staff_id || "");
     const start = new Date(appointment.start_time);
@@ -40,15 +47,45 @@ export default function EditBookingDialog({ open, onOpenChange, appointment, ser
     setInternalNotes(appointment.internal_notes || "");
     setIsNoShow(appointment.status === "No-Show");
     setConfirmDelete(false);
+
+    // Load extra services
+    (async () => {
+      const { data } = await supabase
+        .from("appointment_services")
+        .select("*")
+        .eq("appointment_id", appointment.id);
+      const rows = data || [];
+      setOriginalExtras(rows);
+      setExtraServices(rows.map((r: any) => ({ id: r.id, service_id: r.service_id })));
+    })();
   }, [appointment, open]);
+
+  const mainService = services.find((s: any) => s.id === serviceId);
+  const extraDetails = extraServices
+    .map((e) => services.find((s: any) => s.id === e.service_id))
+    .filter(Boolean) as any[];
+
+  const totalDuration = (mainService?.duration || 0) + extraDetails.reduce((sum, s) => sum + (s.duration || 0), 0);
+  const totalPrice = (mainService?.price || 0) + extraDetails.reduce((sum, s) => sum + Number(s.price || 0), 0);
+
+  const handleAddExtra = () => {
+    setExtraServices([...extraServices, { service_id: "" }]);
+  };
+
+  const handleRemoveExtra = (idx: number) => {
+    setExtraServices(extraServices.filter((_, i) => i !== idx));
+  };
+
+  const handleChangeExtra = (idx: number, value: string) => {
+    setExtraServices(extraServices.map((e, i) => (i === idx ? { ...e, service_id: value } : e)));
+  };
 
   const handleSave = async () => {
     if (!appointment) return;
     setSaving(true);
-    const service = services.find((s: any) => s.id === serviceId);
     const date = new Date(appointment.start_time).toISOString().split("T")[0];
     const startDt = new Date(`${date}T${startTime}:00`);
-    const endDt = new Date(startDt.getTime() + (service?.duration || 30) * 60000);
+    const endDt = new Date(startDt.getTime() + (totalDuration || 30) * 60000);
 
     const { error } = await supabase.from("appointments").update({
       service_id: serviceId || null,
@@ -60,12 +97,38 @@ export default function EditBookingDialog({ open, onOpenChange, appointment, ser
       is_paid: !isNoShow,
     }).eq("id", appointment.id);
 
-    if (error) toast.error(error.message);
-    else {
-      toast.success(t("editBooking.updated"));
-      onOpenChange(false);
-      onUpdated();
+    if (error) {
+      toast.error(error.message);
+      setSaving(false);
+      return;
     }
+
+    // Sync extra services: delete removed, insert new
+    const validExtras = extraServices.filter((e) => e.service_id);
+    const originalIds = originalExtras.map((o) => o.id);
+    const keptIds = validExtras.filter((e) => e.id).map((e) => e.id);
+    const toDelete = originalIds.filter((id) => !keptIds.includes(id));
+    const toInsert = validExtras.filter((e) => !e.id).map((e) => {
+      const svc = services.find((s: any) => s.id === e.service_id);
+      return {
+        appointment_id: appointment.id,
+        service_id: e.service_id,
+        shop_id: appointment.shop_id,
+        duration: svc?.duration || 0,
+        price: svc?.price || 0,
+      };
+    });
+
+    if (toDelete.length > 0) {
+      await supabase.from("appointment_services").delete().in("id", toDelete);
+    }
+    if (toInsert.length > 0) {
+      await supabase.from("appointment_services").insert(toInsert);
+    }
+
+    toast.success(t("editBooking.updated"));
+    onOpenChange(false);
+    onUpdated();
     setSaving(false);
   };
 
@@ -97,7 +160,7 @@ export default function EditBookingDialog({ open, onOpenChange, appointment, ser
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="rounded-2xl">
+      <DialogContent className="rounded-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{t("editBooking.title")}</DialogTitle>
         </DialogHeader>
@@ -133,16 +196,62 @@ export default function EditBookingDialog({ open, onOpenChange, appointment, ser
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">{t("booking.service")}</label>
+            <label className="text-sm font-medium">{t("editBooking.mainService")}</label>
             <Select value={serviceId} onValueChange={setServiceId}>
               <SelectTrigger className="rounded-xl"><SelectValue placeholder={t("booking.selectService")} /></SelectTrigger>
               <SelectContent>
                 {services.map((s: any) => (
-                  <SelectItem key={s.id} value={s.id}>{s.service_name} ({s.duration} min)</SelectItem>
+                  <SelectItem key={s.id} value={s.id}>{s.service_name} ({s.duration} min · €{Number(s.price).toFixed(2)})</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">{t("editBooking.additionalServices")}</label>
+              <Button type="button" variant="ghost" size="sm" className="h-7 rounded-lg text-xs" onClick={handleAddExtra}>
+                <Plus className="h-3 w-3 mr-1" /> {t("editBooking.addService")}
+              </Button>
+            </div>
+            {extraServices.length > 0 && (
+              <div className="space-y-2">
+                {extraServices.map((extra, idx) => {
+                  const svc = services.find((s: any) => s.id === extra.service_id);
+                  return (
+                    <div key={idx} className="flex items-center gap-2">
+                      <Select value={extra.service_id} onValueChange={(v) => handleChangeExtra(idx, v)}>
+                        <SelectTrigger className="rounded-xl flex-1">
+                          <SelectValue placeholder={t("booking.selectService")} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {services.map((s: any) => (
+                            <SelectItem key={s.id} value={s.id}>
+                              {s.service_name} ({s.duration} min · €{Number(s.price).toFixed(2)})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button type="button" variant="ghost" size="icon" className="h-9 w-9 rounded-lg shrink-0" onClick={() => handleRemoveExtra(idx)}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {(mainService || extraDetails.length > 0) && (
+            <div className="rounded-xl border bg-muted/40 p-3 flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">
+                {t("editBooking.totalDuration")}: <span className="font-semibold text-foreground">{totalDuration} min</span>
+              </span>
+              <span className="text-muted-foreground">
+                {t("editBooking.totalPrice")}: <span className="font-semibold text-foreground">€{totalPrice.toFixed(2)}</span>
+              </span>
+            </div>
+          )}
 
           <div className="space-y-2">
             <label className="text-sm font-medium">{t("booking.employee")}</label>
@@ -175,24 +284,22 @@ export default function EditBookingDialog({ open, onOpenChange, appointment, ser
           </Button>
 
           {canEdit ? (
-            <>
-              <div className="flex gap-3">
-                {canDelete && (
-                  !confirmDelete ? (
-                    <Button variant="destructive" size="icon" className="rounded-xl" onClick={() => setConfirmDelete(true)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  ) : (
-                    <Button variant="destructive" className="rounded-xl" onClick={handleDelete} disabled={deleting}>
-                      {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : t("editBooking.confirmDelete")}
-                    </Button>
-                  )
-                )}
-                <Button className="rounded-xl flex-1" onClick={handleSave} disabled={saving}>
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : t("editBooking.saveChanges")}
-                </Button>
-              </div>
-            </>
+            <div className="flex gap-3">
+              {canDelete && (
+                !confirmDelete ? (
+                  <Button variant="destructive" size="icon" className="rounded-xl" onClick={() => setConfirmDelete(true)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button variant="destructive" className="rounded-xl" onClick={handleDelete} disabled={deleting}>
+                    {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : t("editBooking.confirmDelete")}
+                  </Button>
+                )
+              )}
+              <Button className="rounded-xl flex-1" onClick={handleSave} disabled={saving}>
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : t("editBooking.saveChanges")}
+              </Button>
+            </div>
           ) : (
             <p className="text-xs text-muted-foreground text-center">{t("editBooking.viewOnly")}</p>
           )}
