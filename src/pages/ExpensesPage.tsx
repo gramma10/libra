@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Plus, Pencil, Trash2, Loader2, Receipt } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Receipt, Repeat } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,13 +9,16 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import ExpenseDialog from "@/components/expenses/ExpenseDialog";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useShop } from "@/hooks/useShop";
 
 const CATEGORIES = ["Rent", "Electricity", "Water", "Products", "Salaries", "Marketing", "Other"] as const;
 const STATUSES = ["Paid", "Pending"] as const;
+const RECURRENCE_MONTHS: Record<string, number> = { monthly: 1, bimonthly: 2, quarterly: 3, yearly: 12 };
 
 export type Expense = {
   id: string; date: string; category: (typeof CATEGORIES)[number]; amount: number;
   status: (typeof STATUSES)[number]; description: string | null; created_at: string;
+  recurrence_interval?: string; recurrence_parent_id?: string | null;
 };
 
 export default function ExpensesPage() {
