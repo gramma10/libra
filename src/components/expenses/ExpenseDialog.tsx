@@ -7,11 +7,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useShop } from "@/hooks/useShop";
+import { useLanguage } from "@/hooks/useLanguage";
 import { toast } from "sonner";
+import { Repeat } from "lucide-react";
 import type { Expense } from "@/pages/ExpensesPage";
 
 const CATEGORIES = ["Rent", "Electricity", "Water", "Products", "Salaries", "Marketing", "Other"] as const;
 const STATUSES = ["Paid", "Pending"] as const;
+const RECURRENCES = [
+  { value: "none", labelKey: "expenses.recurNone" },
+  { value: "monthly", labelKey: "expenses.recurMonthly" },
+  { value: "bimonthly", labelKey: "expenses.recurBimonthly" },
+  { value: "quarterly", labelKey: "expenses.recurQuarterly" },
+  { value: "yearly", labelKey: "expenses.recurYearly" },
+] as const;
 
 interface Props {
   open: boolean;
@@ -22,12 +31,16 @@ interface Props {
 
 export default function ExpenseDialog({ open, onOpenChange, expense, onSaved }: Props) {
   const { shopId } = useShop();
+  const { t } = useLanguage();
   const [date, setDate] = useState("");
   const [category, setCategory] = useState<string>("Other");
   const [amount, setAmount] = useState("");
   const [status, setStatus] = useState<string>("Pending");
   const [description, setDescription] = useState("");
+  const [recurrence, setRecurrence] = useState<string>("none");
   const [saving, setSaving] = useState(false);
+
+  const isOccurrence = !!expense?.recurrence_parent_id;
 
   useEffect(() => {
     if (expense) {
@@ -36,17 +49,19 @@ export default function ExpenseDialog({ open, onOpenChange, expense, onSaved }: 
       setAmount(String(expense.amount));
       setStatus(expense.status);
       setDescription(expense.description || "");
+      setRecurrence(expense.recurrence_interval || "none");
     } else {
       setDate(new Date().toISOString().split("T")[0]);
       setCategory("Other");
       setAmount("");
       setStatus("Pending");
       setDescription("");
+      setRecurrence("none");
     }
   }, [expense, open]);
 
   const handleSave = async () => {
-    if (!date || !amount) { toast.error("Date and amount are required"); return; }
+    if (!date || !amount) { toast.error(t("expenses.dateAmountRequired")); return; }
     setSaving(true);
 
     const payload: any = {
@@ -58,16 +73,19 @@ export default function ExpenseDialog({ open, onOpenChange, expense, onSaved }: 
     };
 
     if (expense) {
+      // Generated occurrences keep their parent link; only allow editing recurrence on templates (no parent)
+      if (!isOccurrence) payload.recurrence_interval = recurrence;
       const { error } = await supabase.from("expenses").update(payload).eq("id", expense.id);
-      if (error) { toast.error("Save failed"); setSaving(false); return; }
+      if (error) { toast.error(t("expenses.saveFailed")); setSaving(false); return; }
     } else {
       payload.shop_id = shopId;
+      payload.recurrence_interval = recurrence;
       const { error } = await supabase.from("expenses").insert(payload);
-      if (error) { toast.error("Save failed"); setSaving(false); return; }
+      if (error) { toast.error(t("expenses.saveFailed")); setSaving(false); return; }
     }
 
     setSaving(false);
-    toast.success(expense ? "Expense updated" : "Expense added");
+    toast.success(expense ? t("expenses.expenseUpdated") : t("expenses.expenseAdded"));
     onOpenChange(false);
     onSaved();
   };
@@ -76,43 +94,62 @@ export default function ExpenseDialog({ open, onOpenChange, expense, onSaved }: 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{expense ? "Edit Expense" : "New Expense"}</DialogTitle>
+          <DialogTitle>{expense ? t("expenses.editExpense") : t("expenses.newExpense")}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 mt-2">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label>Date</Label>
+              <Label>{t("expenses.dateCol")}</Label>
               <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="rounded-xl" />
             </div>
             <div className="space-y-1.5">
-              <Label>Amount (€)</Label>
+              <Label>{t("expenses.amountEur")}</Label>
               <Input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" className="rounded-xl" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label>Category</Label>
+              <Label>{t("expenses.category")}</Label>
               <Select value={category} onValueChange={setCategory}>
                 <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
                 <SelectContent>{CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Status</Label>
+              <Label>{t("expenses.statusCol")}</Label>
               <Select value={status} onValueChange={setStatus}>
                 <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
                 <SelectContent>{STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           </div>
+
           <div className="space-y-1.5">
-            <Label>Description</Label>
-            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional description..." className="rounded-xl resize-none" rows={3} />
+            <Label className="flex items-center gap-1.5">
+              <Repeat className="h-3.5 w-3.5" />
+              {t("expenses.recurrence")}
+            </Label>
+            <Select value={recurrence} onValueChange={setRecurrence} disabled={isOccurrence}>
+              <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {RECURRENCES.map((r) => <SelectItem key={r.value} value={r.value}>{t(r.labelKey)}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {isOccurrence ? (
+              <p className="text-[11px] text-muted-foreground">{t("expenses.occurrenceHint")}</p>
+            ) : recurrence !== "none" ? (
+              <p className="text-[11px] text-muted-foreground">{t("expenses.recurrenceHint")}</p>
+            ) : null}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>{t("expenses.description")}</Label>
+            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="..." className="rounded-xl resize-none" rows={3} />
           </div>
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="ghost" onClick={() => onOpenChange(false)} className="rounded-xl">Cancel</Button>
+            <Button variant="ghost" onClick={() => onOpenChange(false)} className="rounded-xl">{t("expenses.cancel")}</Button>
             <Button onClick={handleSave} disabled={saving} className="rounded-xl">
-              {saving ? "Saving…" : expense ? "Update" : "Add Expense"}
+              {saving ? "Saving…" : expense ? t("expenses.update") : t("expenses.addExpense")}
             </Button>
           </div>
         </div>

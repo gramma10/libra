@@ -253,6 +253,15 @@ export const el: Record<TranslationKey, string> = {
   "expenses.cancel": "Ακύρωση",
   "expenses.update": "Ενημέρωση",
   "expenses.addExpense": "Προσθήκη Εξόδου",
+  "expenses.recurrence": "Επανάληψη",
+  "expenses.recurNone": "Μία φορά",
+  "expenses.recurMonthly": "Κάθε μήνα",
+  "expenses.recurBimonthly": "Κάθε 2 μήνες",
+  "expenses.recurQuarterly": "Κάθε 3 μήνες",
+  "expenses.recurYearly": "Κάθε χρόνο",
+  "expenses.recurrenceHint": "Οι μελλοντικοί μήνες θα δημιουργούνται αυτόματα. Μπορείς να αλλάξεις το ποσό σε κάθε έναν.",
+  "expenses.occurrenceHint": "Αυτή είναι επαναλαμβανόμενη εμφάνιση — άλλαξε την επανάληψη στο αρχικό έξοδο.",
+  "expenses.recurringBadge": "Επαναλαμβανόμενο",
 
   // Reports
   "reports.title": "Αναλυτικά",
