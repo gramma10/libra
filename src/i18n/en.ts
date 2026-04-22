@@ -260,6 +260,10 @@ export const en = {
   "expenses.recurrenceHint": "Future months will auto-generate. You can edit each one's amount.",
   "expenses.occurrenceHint": "This is a recurring occurrence — change recurrence on the original expense.",
   "expenses.recurringBadge": "Recurring",
+  "expenses.applyScope": "Apply amount change to",
+  "expenses.scopeThis": "Only this month",
+  "expenses.scopeFuture": "This and all future months",
+  "expenses.scopeHint": "Choose whether the new amount affects only this occurrence or also upcoming ones.",
 
   // Reports
   "reports.title": "Analytics",
