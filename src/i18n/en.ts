@@ -251,6 +251,15 @@ export const en = {
   "expenses.cancel": "Cancel",
   "expenses.update": "Update",
   "expenses.addExpense": "Add Expense",
+  "expenses.recurrence": "Recurrence",
+  "expenses.recurNone": "One-time",
+  "expenses.recurMonthly": "Every month",
+  "expenses.recurBimonthly": "Every 2 months",
+  "expenses.recurQuarterly": "Every 3 months",
+  "expenses.recurYearly": "Every year",
+  "expenses.recurrenceHint": "Future months will auto-generate. You can edit each one's amount.",
+  "expenses.occurrenceHint": "This is a recurring occurrence — change recurrence on the original expense.",
+  "expenses.recurringBadge": "Recurring",
 
   // Reports
   "reports.title": "Analytics",

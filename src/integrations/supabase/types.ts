@@ -243,6 +243,8 @@ export type Database = {
           date: string
           description: string | null
           id: string
+          recurrence_interval: string
+          recurrence_parent_id: string | null
           shop_id: string
           status: Database["public"]["Enums"]["expense_status"]
         }
@@ -253,6 +255,8 @@ export type Database = {
           date?: string
           description?: string | null
           id?: string
+          recurrence_interval?: string
+          recurrence_parent_id?: string | null
           shop_id: string
           status?: Database["public"]["Enums"]["expense_status"]
         }
@@ -263,10 +267,19 @@ export type Database = {
           date?: string
           description?: string | null
           id?: string
+          recurrence_interval?: string
+          recurrence_parent_id?: string | null
           shop_id?: string
           status?: Database["public"]["Enums"]["expense_status"]
         }
         Relationships: [
+          {
+            foreignKeyName: "expenses_recurrence_parent_id_fkey"
+            columns: ["recurrence_parent_id"]
+            isOneToOne: false
+            referencedRelation: "expenses"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "expenses_shop_id_fkey"
             columns: ["shop_id"]

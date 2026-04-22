@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Plus, Pencil, Trash2, Loader2, Receipt } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Receipt, Repeat } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,17 +9,82 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import ExpenseDialog from "@/components/expenses/ExpenseDialog";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useShop } from "@/hooks/useShop";
 
 const CATEGORIES = ["Rent", "Electricity", "Water", "Products", "Salaries", "Marketing", "Other"] as const;
 const STATUSES = ["Paid", "Pending"] as const;
+const RECURRENCE_MONTHS: Record<string, number> = { monthly: 1, bimonthly: 2, quarterly: 3, yearly: 12 };
 
 export type Expense = {
   id: string; date: string; category: (typeof CATEGORIES)[number]; amount: number;
   status: (typeof STATUSES)[number]; description: string | null; created_at: string;
+  recurrence_interval?: string; recurrence_parent_id?: string | null;
 };
+
+// Generate any missing recurring occurrences for a given month from active recurring templates
+async function generateRecurringForMonth(shopId: string, year: number, month: number) {
+  // Templates = expenses with recurrence_interval != 'none' AND no parent (originals)
+  const { data: templates } = await supabase
+    .from("expenses" as any)
+    .select("*")
+    .eq("shop_id", shopId)
+    .neq("recurrence_interval", "none")
+    .is("recurrence_parent_id", null);
+
+  if (!templates || templates.length === 0) return;
+
+  const monthStart = new Date(year, month, 1);
+  const monthEnd = new Date(year, month + 1, 0);
+
+  const toInsert: any[] = [];
+
+  for (const tpl of templates as any[]) {
+    const interval = RECURRENCE_MONTHS[tpl.recurrence_interval];
+    if (!interval) continue;
+
+    const tplDate = new Date(tpl.date + "T00:00:00");
+    if (tplDate > monthEnd) continue; // future template
+
+    // Compute the occurrence date for this month based on interval
+    const monthsDiff = (year - tplDate.getFullYear()) * 12 + (month - tplDate.getMonth());
+    if (monthsDiff <= 0 || monthsDiff % interval !== 0) continue;
+
+    // Anchor day = template day, clamped to last day of target month
+    const lastDay = monthEnd.getDate();
+    const day = Math.min(tplDate.getDate(), lastDay);
+    const occDate = new Date(year, month, day).toISOString().split("T")[0];
+
+    // Check if already exists for this template in this month
+    const { data: existing } = await supabase
+      .from("expenses" as any)
+      .select("id")
+      .eq("recurrence_parent_id", tpl.id)
+      .gte("date", monthStart.toISOString().split("T")[0])
+      .lte("date", monthEnd.toISOString().split("T")[0])
+      .limit(1);
+
+    if (existing && existing.length > 0) continue;
+
+    toInsert.push({
+      shop_id: shopId,
+      date: occDate,
+      category: tpl.category,
+      amount: tpl.amount,
+      status: "Pending",
+      description: tpl.description,
+      recurrence_interval: "none",
+      recurrence_parent_id: tpl.id,
+    });
+  }
+
+  if (toInsert.length > 0) {
+    await supabase.from("expenses" as any).insert(toInsert);
+  }
+}
 
 export default function ExpensesPage() {
   const { t, locale } = useLanguage();
+  const { shopId } = useShop();
   const [loading, setLoading] = useState(true);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -37,11 +102,17 @@ export default function ExpensesPage() {
     const year = Number(filterYear);
     const start = new Date(year, month, 1).toISOString().split("T")[0];
     const end = new Date(year, month + 1, 0).toISOString().split("T")[0];
+
+    // Auto-generate missing recurring occurrences for this month
+    if (shopId) {
+      await generateRecurringForMonth(shopId, year, month);
+    }
+
     const { data, error } = await supabase.from("expenses").select("*").gte("date", start).lte("date", end).order("date", { ascending: false });
     if (error) toast.error("Failed to load expenses");
     setExpenses((data as Expense[]) || []);
     setLoading(false);
-  }, [filterMonth, filterYear]);
+  }, [filterMonth, filterYear, shopId]);
 
   useEffect(() => { fetchExpenses(); }, [fetchExpenses]);
 
@@ -120,7 +191,14 @@ export default function ExpensesPage() {
                   <TableCell>
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${categoryColor[exp.category] || ""}`}>{exp.category}</span>
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{exp.description || "—"}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
+                    <div className="flex items-center gap-1.5">
+                      {(exp.recurrence_interval && exp.recurrence_interval !== "none") || exp.recurrence_parent_id ? (
+                        <Repeat className="h-3 w-3 text-primary shrink-0" aria-label={t("expenses.recurringBadge")} />
+                      ) : null}
+                      <span className="truncate">{exp.description || "—"}</span>
+                    </div>
+                  </TableCell>
                   <TableCell className="text-right text-sm font-medium">€{Number(exp.amount).toFixed(2)}</TableCell>
                   <TableCell><Badge variant={exp.status === "Paid" ? "default" : "secondary"} className="text-[10px]">{exp.status}</Badge></TableCell>
                   <TableCell>
