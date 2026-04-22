@@ -141,6 +141,24 @@ export default function ExpensesPage() {
   const handleEdit = (exp: Expense) => { setEditing(exp); setDialogOpen(true); };
   const handleNew = () => { setEditing(null); setDialogOpen(true); };
 
+  const handleBackfill = async () => {
+    if (!shopId) return;
+    setBackfilling(true);
+    const count = await generateRecurringForMonth(
+      shopId,
+      Number(filterYear),
+      Number(filterMonth),
+      { includePast: true }
+    );
+    setBackfilling(false);
+    if (count > 0) {
+      toast.success(t("expenses.generated").replace("{count}", String(count)));
+      fetchExpenses();
+    } else {
+      toast.info(t("expenses.noneMissing"));
+    }
+  };
+
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 5 }, (_, i) => String(currentYear - 2 + i));
   const total = expenses.reduce((s, e) => s + Number(e.amount), 0);
