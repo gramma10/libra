@@ -159,6 +159,37 @@ export default function ExpenseDialog({ open, onOpenChange, expense, onSaved }: 
             ) : null}
           </div>
 
+          {showScope && (
+            <div className="space-y-2 rounded-xl border border-border bg-muted/30 p-3">
+              <Label className="text-xs font-medium">{t("expenses.applyScope")}</Label>
+              <div className="flex flex-col gap-1.5">
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="radio"
+                    name="expense-scope"
+                    value="this"
+                    checked={scope === "this"}
+                    onChange={() => setScope("this")}
+                    className="accent-primary"
+                  />
+                  {t("expenses.scopeThis")}
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="radio"
+                    name="expense-scope"
+                    value="future"
+                    checked={scope === "future"}
+                    onChange={() => setScope("future")}
+                    className="accent-primary"
+                  />
+                  {t("expenses.scopeFuture")}
+                </label>
+              </div>
+              <p className="text-[11px] text-muted-foreground">{t("expenses.scopeHint")}</p>
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <Label>{t("expenses.description")}</Label>
             <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="..." className="rounded-xl resize-none" rows={3} />
