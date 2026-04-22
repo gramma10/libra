@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Plus, Phone, Mail, ChevronRight, Loader2, CalendarDays, DollarSign, UserX, Clock, Pencil, Trash2, Receipt } from "lucide-react";
+import { Plus, Phone, Mail, ChevronRight, Loader2, CalendarDays, DollarSign, UserX, Clock, Pencil, Trash2, Receipt, TrendingUp } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -199,6 +199,32 @@ export default function ClientsPage() {
     const completedVisits = pastVisits.length;
     const avgTicket = completedVisits > 0 ? revenue / completedVisits : 0;
     return { totalAppts: validAppts.length, revenue, lastVisitDays, noShows, avgTicket };
+  }, [clientAppointments]);
+
+  const topServices = useMemo(() => {
+    const now = new Date();
+    const agg: Record<string, { name: string; count: number; spend: number }> = {};
+    clientAppointments.forEach((a: any) => {
+      if (a.status === "Cancelled" || a.status === "No-Show") return;
+      const endTime = new Date(a.end_time);
+      if (a.status !== "Completed" && endTime >= now) return;
+      // Main service
+      if (a.services?.service_name) {
+        const key = a.services.service_name;
+        if (!agg[key]) agg[key] = { name: key, count: 0, spend: 0 };
+        agg[key].count += 1;
+        agg[key].spend += Number(a.services.price || 0);
+      }
+      // Extras
+      (a.appointment_services || []).forEach((ex: any) => {
+        const name = ex.services?.service_name;
+        if (!name) return;
+        if (!agg[name]) agg[name] = { name, count: 0, spend: 0 };
+        agg[name].count += 1;
+        agg[name].spend += Number(ex.price || 0);
+      });
+    });
+    return Object.values(agg).sort((a, b) => b.spend - a.spend).slice(0, 5);
   }, [clientAppointments]);
 
   const handleAdd = async () => {
@@ -445,6 +471,42 @@ export default function ClientsPage() {
 
               {selected.birthday && (
                 <p className="text-sm text-muted-foreground">🎂 Birthday: {new Date(selected.birthday).toLocaleDateString()}</p>
+              )}
+
+              {topServices.length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4" strokeWidth={1.5} />
+                    Top Services
+                  </h3>
+                  <div className="rounded-xl border border-border overflow-hidden">
+                    {topServices.map((svc, idx) => {
+                      const maxSpend = topServices[0].spend || 1;
+                      const pct = (svc.spend / maxSpend) * 100;
+                      return (
+                        <div key={svc.name} className={cn("relative px-4 py-3", idx !== topServices.length - 1 && "border-b border-border")}>
+                          <div
+                            className="absolute inset-y-0 left-0 bg-primary/5"
+                            style={{ width: `${pct}%` }}
+                            aria-hidden
+                          />
+                          <div className="relative flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                                {idx + 1}
+                              </span>
+                              <span className="font-medium truncate">{svc.name}</span>
+                            </div>
+                            <div className="flex items-center gap-4 text-sm shrink-0">
+                              <span className="text-muted-foreground">{svc.count}×</span>
+                              <span className="font-semibold tabular-nums">€{svc.spend.toFixed(0)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
 
               {clientAppointments.length > 0 && (
