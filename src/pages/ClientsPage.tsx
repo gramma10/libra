@@ -67,7 +67,7 @@ export default function ClientsPage() {
     // Fetch appointment data for filters (service history, last visit, revenue)
     supabase
       .from("appointments")
-      .select("client_id, service_id, start_time, end_time, status, services(price)")
+      .select("id, client_id, service_id, start_time, end_time, status, services(price), appointment_services(price, service_id)")
       .then(({ data }) => {
         const serviceMap: Record<string, Set<string>> = {};
         const lastVisitMap: Record<string, Date> = {};
@@ -76,11 +76,12 @@ export default function ClientsPage() {
         const now = new Date();
 
         (data || []).forEach((a: any) => {
-          // Service history map
-          if (a.service_id) {
-            if (!serviceMap[a.client_id]) serviceMap[a.client_id] = new Set();
-            serviceMap[a.client_id].add(a.service_id);
-          }
+          // Service history map (main + extras)
+          if (!serviceMap[a.client_id]) serviceMap[a.client_id] = new Set();
+          if (a.service_id) serviceMap[a.client_id].add(a.service_id);
+          (a.appointment_services || []).forEach((ex: any) => {
+            if (ex.service_id) serviceMap[a.client_id].add(ex.service_id);
+          });
 
           // Skip cancelled/no-show for visit and revenue
           if (a.status === "Cancelled" || a.status === "No-Show") return;
@@ -93,8 +94,9 @@ export default function ClientsPage() {
             lastVisitMap[a.client_id] = endTime;
           }
 
-          // Revenue & visit count
-          revenueMap[a.client_id] = (revenueMap[a.client_id] || 0) + (a.services?.price || 0);
+          // Revenue (main service + extras) & visit count
+          const extrasTotal = (a.appointment_services || []).reduce((s: number, ex: any) => s + Number(ex.price || 0), 0);
+          revenueMap[a.client_id] = (revenueMap[a.client_id] || 0) + Number(a.services?.price || 0) + extrasTotal;
           visitCountMap[a.client_id] = (visitCountMap[a.client_id] || 0) + 1;
         });
 
@@ -112,7 +114,7 @@ export default function ClientsPage() {
       setLoadingAppts(true);
       const { data } = await supabase
         .from("appointments")
-        .select("id, start_time, end_time, status, is_paid, services(price, service_name)")
+        .select("id, start_time, end_time, status, is_paid, services(price, service_name), appointment_services(price, services(service_name))")
         .eq("client_id", selected.id)
         .order("start_time", { ascending: false });
       setClientAppointments(data || []);
@@ -179,7 +181,10 @@ export default function ClientsPage() {
     const revenue = clientAppointments.reduce((sum, a) => {
       if (a.status === "Cancelled" || a.status === "No-Show") return sum;
       const endTime = new Date(a.end_time);
-      if (a.status === "Completed" || endTime < now) return sum + (a.services?.price || 0);
+      if (a.status === "Completed" || endTime < now) {
+        const extras = (a.appointment_services || []).reduce((s: number, ex: any) => s + Number(ex.price || 0), 0);
+        return sum + Number(a.services?.price || 0) + extras;
+      }
       return sum;
     }, 0);
     const pastVisits = clientAppointments.filter((a) => {
@@ -456,23 +461,30 @@ export default function ClientsPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {clientAppointments.slice(0, 10).map((appt) => (
-                          <tr key={appt.id} className="border-b last:border-0">
-                            <td className="px-4 py-2">{new Date(appt.start_time).toLocaleDateString()}</td>
-                            <td className="px-4 py-2">{appt.services?.service_name || "—"}</td>
-                            <td className="px-4 py-2">
-                              <span className={cn(
-                                "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
-                                appt.status === "No-Show" ? "bg-destructive/10 text-destructive" :
-                                appt.status === "Cancelled" ? "bg-muted text-muted-foreground" :
-                                "bg-primary/10 text-primary"
-                              )}>
-                                {appt.status}
-                              </span>
-                            </td>
-                            <td className="px-4 py-2 text-right">€{(appt.services?.price || 0).toFixed(0)}</td>
-                          </tr>
-                        ))}
+                        {clientAppointments.slice(0, 10).map((appt) => {
+                          const extras = appt.appointment_services || [];
+                          const extrasNames = extras.map((ex: any) => ex.services?.service_name).filter(Boolean);
+                          const serviceLabel = [appt.services?.service_name, ...extrasNames].filter(Boolean).join(" + ") || "—";
+                          const extrasTotal = extras.reduce((s: number, ex: any) => s + Number(ex.price || 0), 0);
+                          const totalPrice = Number(appt.services?.price || 0) + extrasTotal;
+                          return (
+                            <tr key={appt.id} className="border-b last:border-0">
+                              <td className="px-4 py-2">{new Date(appt.start_time).toLocaleDateString()}</td>
+                              <td className="px-4 py-2">{serviceLabel}</td>
+                              <td className="px-4 py-2">
+                                <span className={cn(
+                                  "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+                                  appt.status === "No-Show" ? "bg-destructive/10 text-destructive" :
+                                  appt.status === "Cancelled" ? "bg-muted text-muted-foreground" :
+                                  "bg-primary/10 text-primary"
+                                )}>
+                                  {appt.status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2 text-right">€{totalPrice.toFixed(0)}</td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
