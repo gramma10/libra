@@ -461,23 +461,30 @@ export default function ClientsPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {clientAppointments.slice(0, 10).map((appt) => (
-                          <tr key={appt.id} className="border-b last:border-0">
-                            <td className="px-4 py-2">{new Date(appt.start_time).toLocaleDateString()}</td>
-                            <td className="px-4 py-2">{appt.services?.service_name || "—"}</td>
-                            <td className="px-4 py-2">
-                              <span className={cn(
-                                "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
-                                appt.status === "No-Show" ? "bg-destructive/10 text-destructive" :
-                                appt.status === "Cancelled" ? "bg-muted text-muted-foreground" :
-                                "bg-primary/10 text-primary"
-                              )}>
-                                {appt.status}
-                              </span>
-                            </td>
-                            <td className="px-4 py-2 text-right">€{(appt.services?.price || 0).toFixed(0)}</td>
-                          </tr>
-                        ))}
+                        {clientAppointments.slice(0, 10).map((appt) => {
+                          const extras = appt.appointment_services || [];
+                          const extrasNames = extras.map((ex: any) => ex.services?.service_name).filter(Boolean);
+                          const serviceLabel = [appt.services?.service_name, ...extrasNames].filter(Boolean).join(" + ") || "—";
+                          const extrasTotal = extras.reduce((s: number, ex: any) => s + Number(ex.price || 0), 0);
+                          const totalPrice = Number(appt.services?.price || 0) + extrasTotal;
+                          return (
+                            <tr key={appt.id} className="border-b last:border-0">
+                              <td className="px-4 py-2">{new Date(appt.start_time).toLocaleDateString()}</td>
+                              <td className="px-4 py-2">{serviceLabel}</td>
+                              <td className="px-4 py-2">
+                                <span className={cn(
+                                  "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+                                  appt.status === "No-Show" ? "bg-destructive/10 text-destructive" :
+                                  appt.status === "Cancelled" ? "bg-muted text-muted-foreground" :
+                                  "bg-primary/10 text-primary"
+                                )}>
+                                  {appt.status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2 text-right">€{totalPrice.toFixed(0)}</td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
