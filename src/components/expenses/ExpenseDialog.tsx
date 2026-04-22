@@ -39,8 +39,13 @@ export default function ExpenseDialog({ open, onOpenChange, expense, onSaved }: 
   const [description, setDescription] = useState("");
   const [recurrence, setRecurrence] = useState<string>("none");
   const [saving, setSaving] = useState(false);
+  const [scope, setScope] = useState<"this" | "future">("this");
 
   const isOccurrence = !!expense?.recurrence_parent_id;
+  const isRecurringTemplate = !!expense && !expense.recurrence_parent_id && (expense.recurrence_interval || "none") !== "none";
+  const isRecurring = isOccurrence || isRecurringTemplate;
+  const amountChanged = !!expense && Number(amount || 0) !== Number(expense.amount);
+  const showScope = isRecurring && amountChanged;
 
   useEffect(() => {
     if (expense) {
@@ -58,25 +63,37 @@ export default function ExpenseDialog({ open, onOpenChange, expense, onSaved }: 
       setDescription("");
       setRecurrence("none");
     }
+    setScope("this");
   }, [expense, open]);
 
   const handleSave = async () => {
     if (!date || !amount) { toast.error(t("expenses.dateAmountRequired")); return; }
     setSaving(true);
 
+    const newAmount = Number(amount);
     const payload: any = {
       date,
       category: category as Expense["category"],
-      amount: Number(amount),
+      amount: newAmount,
       status: status as Expense["status"],
       description,
     };
 
     if (expense) {
-      // Generated occurrences keep their parent link; only allow editing recurrence on templates (no parent)
       if (!isOccurrence) payload.recurrence_interval = recurrence;
       const { error } = await supabase.from("expenses").update(payload).eq("id", expense.id);
       if (error) { toast.error(t("expenses.saveFailed")); setSaving(false); return; }
+
+      // Propagate amount change to template + future siblings if scope = future
+      if (showScope && scope === "future") {
+        const parentId = isOccurrence ? expense.recurrence_parent_id! : expense.id;
+        await supabase.from("expenses").update({ amount: newAmount }).eq("id", parentId);
+        await supabase
+          .from("expenses")
+          .update({ amount: newAmount })
+          .eq("recurrence_parent_id", parentId)
+          .gt("date", expense.date);
+      }
     } else {
       payload.shop_id = shopId;
       payload.recurrence_interval = recurrence;
