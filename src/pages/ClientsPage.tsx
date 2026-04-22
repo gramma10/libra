@@ -181,7 +181,10 @@ export default function ClientsPage() {
     const revenue = clientAppointments.reduce((sum, a) => {
       if (a.status === "Cancelled" || a.status === "No-Show") return sum;
       const endTime = new Date(a.end_time);
-      if (a.status === "Completed" || endTime < now) return sum + (a.services?.price || 0);
+      if (a.status === "Completed" || endTime < now) {
+        const extras = (a.appointment_services || []).reduce((s: number, ex: any) => s + Number(ex.price || 0), 0);
+        return sum + Number(a.services?.price || 0) + extras;
+      }
       return sum;
     }, 0);
     const pastVisits = clientAppointments.filter((a) => {
