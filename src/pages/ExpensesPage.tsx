@@ -23,6 +23,7 @@ export type Expense = {
 
 export default function ExpensesPage() {
   const { t, locale } = useLanguage();
+  const { shopId } = useShop();
   const [loading, setLoading] = useState(true);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -40,11 +41,17 @@ export default function ExpensesPage() {
     const year = Number(filterYear);
     const start = new Date(year, month, 1).toISOString().split("T")[0];
     const end = new Date(year, month + 1, 0).toISOString().split("T")[0];
+
+    // Auto-generate missing recurring occurrences for this month
+    if (shopId) {
+      await generateRecurringForMonth(shopId, year, month);
+    }
+
     const { data, error } = await supabase.from("expenses").select("*").gte("date", start).lte("date", end).order("date", { ascending: false });
     if (error) toast.error("Failed to load expenses");
     setExpenses((data as Expense[]) || []);
     setLoading(false);
-  }, [filterMonth, filterYear]);
+  }, [filterMonth, filterYear, shopId]);
 
   useEffect(() => { fetchExpenses(); }, [fetchExpenses]);
 
