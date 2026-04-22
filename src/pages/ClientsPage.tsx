@@ -114,7 +114,7 @@ export default function ClientsPage() {
       setLoadingAppts(true);
       const { data } = await supabase
         .from("appointments")
-        .select("id, start_time, end_time, status, is_paid, services(price, service_name)")
+        .select("id, start_time, end_time, status, is_paid, services(price, service_name), appointment_services(price, services(service_name))")
         .eq("client_id", selected.id)
         .order("start_time", { ascending: false });
       setClientAppointments(data || []);
