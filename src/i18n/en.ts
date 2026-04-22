@@ -264,6 +264,10 @@ export const en = {
   "expenses.scopeThis": "Only this month",
   "expenses.scopeFuture": "This and all future months",
   "expenses.scopeHint": "Choose whether the new amount affects only this occurrence or also upcoming ones.",
+  "expenses.generateMissed": "Generate missed",
+  "expenses.generated": "Generated {count} missing expense(s)",
+  "expenses.noneMissing": "No missing recurring expenses for this month",
+  "expenses.generating": "Generating…",
 
   // Reports
   "reports.title": "Analytics",
