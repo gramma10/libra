@@ -67,7 +67,7 @@ export default function ClientsPage() {
     // Fetch appointment data for filters (service history, last visit, revenue)
     supabase
       .from("appointments")
-      .select("client_id, service_id, start_time, end_time, status, services(price)")
+      .select("id, client_id, service_id, start_time, end_time, status, services(price), appointment_services(price, service_id)")
       .then(({ data }) => {
         const serviceMap: Record<string, Set<string>> = {};
         const lastVisitMap: Record<string, Date> = {};
@@ -76,11 +76,12 @@ export default function ClientsPage() {
         const now = new Date();
 
         (data || []).forEach((a: any) => {
-          // Service history map
-          if (a.service_id) {
-            if (!serviceMap[a.client_id]) serviceMap[a.client_id] = new Set();
-            serviceMap[a.client_id].add(a.service_id);
-          }
+          // Service history map (main + extras)
+          if (!serviceMap[a.client_id]) serviceMap[a.client_id] = new Set();
+          if (a.service_id) serviceMap[a.client_id].add(a.service_id);
+          (a.appointment_services || []).forEach((ex: any) => {
+            if (ex.service_id) serviceMap[a.client_id].add(ex.service_id);
+          });
 
           // Skip cancelled/no-show for visit and revenue
           if (a.status === "Cancelled" || a.status === "No-Show") return;
@@ -93,8 +94,9 @@ export default function ClientsPage() {
             lastVisitMap[a.client_id] = endTime;
           }
 
-          // Revenue & visit count
-          revenueMap[a.client_id] = (revenueMap[a.client_id] || 0) + (a.services?.price || 0);
+          // Revenue (main service + extras) & visit count
+          const extrasTotal = (a.appointment_services || []).reduce((s: number, ex: any) => s + Number(ex.price || 0), 0);
+          revenueMap[a.client_id] = (revenueMap[a.client_id] || 0) + Number(a.services?.price || 0) + extrasTotal;
           visitCountMap[a.client_id] = (visitCountMap[a.client_id] || 0) + 1;
         });
 
