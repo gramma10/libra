@@ -201,6 +201,32 @@ export default function ClientsPage() {
     return { totalAppts: validAppts.length, revenue, lastVisitDays, noShows, avgTicket };
   }, [clientAppointments]);
 
+  const topServices = useMemo(() => {
+    const now = new Date();
+    const agg: Record<string, { name: string; count: number; spend: number }> = {};
+    clientAppointments.forEach((a: any) => {
+      if (a.status === "Cancelled" || a.status === "No-Show") return;
+      const endTime = new Date(a.end_time);
+      if (a.status !== "Completed" && endTime >= now) return;
+      // Main service
+      if (a.services?.service_name) {
+        const key = a.services.service_name;
+        if (!agg[key]) agg[key] = { name: key, count: 0, spend: 0 };
+        agg[key].count += 1;
+        agg[key].spend += Number(a.services.price || 0);
+      }
+      // Extras
+      (a.appointment_services || []).forEach((ex: any) => {
+        const name = ex.services?.service_name;
+        if (!name) return;
+        if (!agg[name]) agg[name] = { name, count: 0, spend: 0 };
+        agg[name].count += 1;
+        agg[name].spend += Number(ex.price || 0);
+      });
+    });
+    return Object.values(agg).sort((a, b) => b.spend - a.spend).slice(0, 5);
+  }, [clientAppointments]);
+
   const handleAdd = async () => {
     if (!form.first_name || !form.last_name || !form.phone_mobile) {
       toast.error("Name and phone are required");
