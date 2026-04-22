@@ -473,6 +473,42 @@ export default function ClientsPage() {
                 <p className="text-sm text-muted-foreground">🎂 Birthday: {new Date(selected.birthday).toLocaleDateString()}</p>
               )}
 
+              {topServices.length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4" strokeWidth={1.5} />
+                    Top Services
+                  </h3>
+                  <div className="rounded-xl border border-border overflow-hidden">
+                    {topServices.map((svc, idx) => {
+                      const maxSpend = topServices[0].spend || 1;
+                      const pct = (svc.spend / maxSpend) * 100;
+                      return (
+                        <div key={svc.name} className={cn("relative px-4 py-3", idx !== topServices.length - 1 && "border-b border-border")}>
+                          <div
+                            className="absolute inset-y-0 left-0 bg-primary/5"
+                            style={{ width: `${pct}%` }}
+                            aria-hidden
+                          />
+                          <div className="relative flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                                {idx + 1}
+                              </span>
+                              <span className="font-medium truncate">{svc.name}</span>
+                            </div>
+                            <div className="flex items-center gap-4 text-sm shrink-0">
+                              <span className="text-muted-foreground">{svc.count}×</span>
+                              <span className="font-semibold tabular-nums">€{svc.spend.toFixed(0)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {clientAppointments.length > 0 && (
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Recent Appointments</h3>
