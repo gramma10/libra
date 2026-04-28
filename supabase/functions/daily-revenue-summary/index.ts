@@ -8,11 +8,11 @@ const corsHeaders = {
 
 const TZ = "Europe/Athens";
 
-function dayBoundsISO(dateStr: string) {
-  // dateStr is YYYY-MM-DD interpreted as Europe/Athens day
-  // Approx: Athens is UTC+2/+3. We'll use the JS Date parsing with explicit offset via toLocaleString round-trip.
-  const start = new Date(`${dateStr}T00:00:00+02:00`);
-  const end = new Date(`${dateStr}T23:59:59.999+02:00`);
+type Period = "day" | "week" | "month";
+
+function rangeBoundsISO(startDate: string, endDate: string) {
+  const start = new Date(`${startDate}T00:00:00+02:00`);
+  const end = new Date(`${endDate}T23:59:59.999+02:00`);
   return { startISO: start.toISOString(), endISO: end.toISOString() };
 }
 
@@ -22,8 +22,49 @@ function shiftDate(dateStr: string, days: number) {
   return d.toLocaleDateString("en-CA", { timeZone: TZ });
 }
 
-interface DayStats {
-  date: string;
+function diffDays(startDate: string, endDate: string) {
+  const a = new Date(`${startDate}T12:00:00+02:00`).getTime();
+  const b = new Date(`${endDate}T12:00:00+02:00`).getTime();
+  return Math.round((b - a) / 86400000) + 1;
+}
+
+// Compute period range from anchor date
+function computeRange(anchor: string, period: Period): { start: string; end: string } {
+  if (period === "day") return { start: anchor, end: anchor };
+  const d = new Date(`${anchor}T12:00:00+02:00`);
+  if (period === "week") {
+    // ISO week: Monday-Sunday
+    const dow = (d.getUTCDay() + 6) % 7; // Mon=0
+    const start = new Date(d);
+    start.setUTCDate(d.getUTCDate() - dow);
+    const end = new Date(start);
+    end.setUTCDate(start.getUTCDate() + 6);
+    return {
+      start: start.toLocaleDateString("en-CA", { timeZone: TZ }),
+      end: end.toLocaleDateString("en-CA", { timeZone: TZ }),
+    };
+  }
+  // month
+  const y = d.getUTCFullYear();
+  const m = d.getUTCMonth();
+  const start = new Date(Date.UTC(y, m, 1, 12));
+  const end = new Date(Date.UTC(y, m + 1, 0, 12));
+  return {
+    start: start.toLocaleDateString("en-CA", { timeZone: TZ }),
+    end: end.toLocaleDateString("en-CA", { timeZone: TZ }),
+  };
+}
+
+// Previous comparable range
+function previousRange(start: string, end: string): { start: string; end: string } {
+  const len = diffDays(start, end);
+  return { start: shiftDate(start, -len), end: shiftDate(end, -len) };
+}
+
+interface RangeStats {
+  start: string;
+  end: string;
+  days: number;
   totalRevenue: number;
   cashRevenue: number;
   cardRevenue: number;
@@ -35,12 +76,13 @@ interface DayStats {
   topServices: { name: string; revenue: number; count: number }[];
 }
 
-async function getDayStats(
+async function getRangeStats(
   supabase: ReturnType<typeof createClient>,
   shopId: string,
-  dateStr: string,
-): Promise<DayStats> {
-  const { startISO, endISO } = dayBoundsISO(dateStr);
+  startDate: string,
+  endDate: string,
+): Promise<RangeStats> {
+  const { startISO, endISO } = rangeBoundsISO(startDate, endDate);
 
   const [apptRes, txRes, salesRes, staffRes] = await Promise.all([
     supabase
@@ -61,7 +103,8 @@ async function getDayStats(
       .from("product_sales")
       .select("total_amount")
       .eq("shop_id", shopId)
-      .eq("sale_date", dateStr),
+      .gte("sale_date", startDate)
+      .lte("sale_date", endDate),
     supabase.from("staff").select("id, first_name, last_name").eq("shop_id", shopId),
   ]);
 
@@ -124,7 +167,9 @@ async function getDayStats(
     .slice(0, 5);
 
   return {
-    date: dateStr,
+    start: startDate,
+    end: endDate,
+    days: diffDays(startDate, endDate),
     totalRevenue: serviceRevenue + productRevenue,
     cashRevenue,
     cardRevenue,
@@ -167,12 +212,13 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const date: string =
+    const anchor: string =
       body.date ||
       new Date().toLocaleDateString("en-CA", { timeZone: TZ });
+    const period: Period =
+      body.period === "week" || body.period === "month" ? body.period : "day";
     const language: string = body.language === "el" ? "el" : "en";
 
-    // Resolve user's shop
     const { data: member } = await supabase
       .from("shop_members")
       .select("shop_id")
@@ -187,11 +233,12 @@ Deno.serve(async (req) => {
     }
 
     const shopId = member.shop_id as string;
-    const prevDate = shiftDate(date, -1);
+    const current = computeRange(anchor, period);
+    const previous = previousRange(current.start, current.end);
 
-    const [today, yesterday] = await Promise.all([
-      getDayStats(supabase, shopId, date),
-      getDayStats(supabase, shopId, prevDate),
+    const [currentStats, previousStats] = await Promise.all([
+      getRangeStats(supabase, shopId, current.start, current.end),
+      getRangeStats(supabase, shopId, previous.start, previous.end),
     ]);
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -210,17 +257,22 @@ Deno.serve(async (req) => {
         ? "Reply in Greek (Ελληνικά). Use a friendly, concise tone."
         : "Reply in English. Use a friendly, concise tone.";
 
-    const systemPrompt = `You are a salon business analytics assistant. Given today's and yesterday's data, write a SHORT daily revenue summary (max 140 words) for the salon owner.
+    const periodLabel =
+      period === "day" ? "day" : period === "week" ? "week" : "month";
+    const wordCap = period === "day" ? 140 : 200;
+
+    const systemPrompt = `You are a salon business analytics assistant. Given the current ${periodLabel}'s and the previous comparable ${periodLabel}'s data, write a SHORT revenue summary (max ${wordCap} words) for the salon owner.
 
 Structure your reply as 3 short sections with markdown:
-**📊 Revenue snapshot** — total revenue today vs yesterday with % change, and explicitly call out the cash vs card split and how it shifted.
-**🔑 Key drivers** — 1-2 sentences explaining what drove the change (top services, product sales, no-shows, completed appointments).
-**🏆 Top staff** — name the top performer(s) by revenue today and how they compare.
+**📊 Revenue snapshot** — total revenue this ${periodLabel} vs the previous ${periodLabel} with % change, and explicitly call out the cash vs card split and how it shifted.
+**🔑 Key drivers** — 1-3 sentences explaining what drove the change (top services, product sales, no-shows, completed appointments). For week/month, mention trends across days if relevant.
+**🏆 Top staff** — name the top performer(s) by revenue and how they compare.
 
-If today has zero data, say so plainly and skip drivers. Use € for currency. ${langInstruction}`;
+If the period has zero data, say so plainly and skip drivers. Use € for currency. ${langInstruction}`;
 
-    const userContent = `Today (${today.date}): ${JSON.stringify(today)}
-Yesterday (${yesterday.date}): ${JSON.stringify(yesterday)}`;
+    const userContent = `Period: ${periodLabel}
+Current (${currentStats.start} → ${currentStats.end}): ${JSON.stringify(currentStats)}
+Previous (${previousStats.start} → ${previousStats.end}): ${JSON.stringify(previousStats)}`;
 
     const aiResp = await fetch(
       "https://ai.gateway.lovable.dev/v1/chat/completions",
@@ -276,7 +328,14 @@ Yesterday (${yesterday.date}): ${JSON.stringify(yesterday)}`;
       aiJson.choices?.[0]?.message?.content?.trim() || "";
 
     return new Response(
-      JSON.stringify({ summary, today, yesterday }),
+      JSON.stringify({
+        summary,
+        period,
+        range: current,
+        previousRange: previous,
+        current: currentStats,
+        previous: previousStats,
+      }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       },
