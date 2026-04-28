@@ -12,7 +12,7 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: true,
-    include: ["src/test/rbac/**/*.test.ts"],
+    include: ["src/test/rbac/**/*.test.ts", "src/test/jobs/**/*.test.ts"],
     testTimeout: 60_000,
     hookTimeout: 120_000,
     // Single fork — tests share seeded users and must run sequentially.

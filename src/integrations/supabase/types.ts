@@ -88,6 +88,9 @@ export type Database = {
           id: string
           internal_notes: string | null
           is_paid: boolean
+          reminder_attempts: number
+          reminder_last_error: string | null
+          reminder_next_retry_at: string | null
           reminder_sent: boolean
           service_id: string | null
           shop_id: string
@@ -102,6 +105,9 @@ export type Database = {
           id?: string
           internal_notes?: string | null
           is_paid?: boolean
+          reminder_attempts?: number
+          reminder_last_error?: string | null
+          reminder_next_retry_at?: string | null
           reminder_sent?: boolean
           service_id?: string | null
           shop_id: string
@@ -116,6 +122,9 @@ export type Database = {
           id?: string
           internal_notes?: string | null
           is_paid?: boolean
+          reminder_attempts?: number
+          reminder_last_error?: string | null
+          reminder_next_retry_at?: string | null
           reminder_sent?: boolean
           service_id?: string | null
           shop_id?: string
@@ -468,6 +477,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      notifications: {
+        Row: {
+          body: string
+          created_at: string
+          dedupe_key: string
+          id: string
+          is_dismissed: boolean
+          is_read: boolean
+          payload: Json
+          severity: string
+          shop_id: string
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          body?: string
+          created_at?: string
+          dedupe_key: string
+          id?: string
+          is_dismissed?: boolean
+          is_read?: boolean
+          payload?: Json
+          severity?: string
+          shop_id: string
+          title: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          dedupe_key?: string
+          id?: string
+          is_dismissed?: boolean
+          is_read?: boolean
+          payload?: Json
+          severity?: string
+          shop_id?: string
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       product_sales: {
         Row: {
@@ -838,6 +892,8 @@ export type Database = {
           last_name: string
         }[]
       }
+      reset_stale_reminder_retries: { Args: never; Returns: number }
+      scan_low_stock_and_notify: { Args: never; Returns: number }
     }
     Enums: {
       app_role: "admin" | "manager" | "staff"
