@@ -6,6 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import ReportsCalendar from "@/components/reports/ReportsCalendar";
 import StatCard from "@/components/reports/StatCard";
 import RevenuePieChart from "@/components/reports/RevenuePieChart";
+import DailyAISummary from "@/components/reports/DailyAISummary";
 import { useRole } from "@/hooks/useRole";
 import { useLanguage } from "@/hooks/useLanguage";
 import { Button } from "@/components/ui/button";
@@ -235,6 +236,8 @@ export default function ReportsPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, i) => (<StatCard key={stat.label} stat={stat} index={i} />))}
       </div>
+
+      {isAdmin && <DailyAISummary />}
 
       <div className="rounded-2xl border border-border bg-card p-4 shadow-apple flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         {viewMode === "month" && (
