@@ -237,6 +237,8 @@ export default function ReportsPage() {
         {stats.map((stat, i) => (<StatCard key={stat.label} stat={stat} index={i} />))}
       </div>
 
+      {isAdmin && <DailyAISummary />}
+
       <div className="rounded-2xl border border-border bg-card p-4 shadow-apple flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         {viewMode === "month" && (
           <div>
