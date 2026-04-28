@@ -58,7 +58,7 @@ serve(async (req) => {
     // Find appointments needing reminders across all SMS-enabled shops
     const { data: appointments, error } = await supabase
       .from('appointments')
-      .select('id, start_time, client_id, shop_id, clients(first_name, phone_mobile)')
+      .select('id, start_time, client_id, shop_id, clients!appointments_client_fk(first_name, phone_mobile)')
       .eq('reminder_sent', false)
       .neq('status', 'Cancelled')
       .neq('status', 'No-Show')
