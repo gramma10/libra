@@ -67,7 +67,7 @@ export default function ClientsPage() {
     // Fetch appointment data for filters (service history, last visit, revenue)
     supabase
       .from("appointments")
-      .select("id, client_id, service_id, start_time, end_time, status, services(price), appointment_services(price, service_id)")
+      .select("id, client_id, service_id, start_time, end_time, status, services!appointments_service_id_fkey(price), appointment_services!appt_services_appointment_fk(price, service_id)")
       .then(({ data }) => {
         const serviceMap: Record<string, Set<string>> = {};
         const lastVisitMap: Record<string, Date> = {};
