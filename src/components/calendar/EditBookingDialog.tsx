@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useRole } from "@/hooks/useRole";
 import { useLanguage } from "@/hooks/useLanguage";
+import { bookingErrorMessage } from "@/lib/booking-errors";
 
 interface EditBookingDialogProps {
   open: boolean;
@@ -98,7 +99,7 @@ export default function EditBookingDialog({ open, onOpenChange, appointment, ser
     }).eq("id", appointment.id);
 
     if (error) {
-      toast.error(error.message);
+      toast.error(bookingErrorMessage(error, error.message));
       setSaving(false);
       return;
     }

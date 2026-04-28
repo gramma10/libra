@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
+import { bookingErrorMessage } from "@/lib/booking-errors";
 
 interface NewBookingDialogProps {
   open: boolean;
@@ -131,7 +132,7 @@ export default function NewBookingDialog({ open, onOpenChange, currentDate, pref
         .single();
 
       if (insertError) {
-        toast.error(insertError.message);
+        toast.error(bookingErrorMessage(insertError, insertError.message));
         setSaving(false);
         return;
       }

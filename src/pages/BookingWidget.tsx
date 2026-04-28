@@ -312,7 +312,8 @@ export default function BookingWidget() {
     }).select("*").single();
 
     if (error) {
-      toast.error(error.message);
+      const { bookingErrorMessage } = await import("@/lib/booking-errors");
+      toast.error(bookingErrorMessage(error, error.message));
     } else {
       toast.success("Booking confirmed!");
       setStep("confirm");

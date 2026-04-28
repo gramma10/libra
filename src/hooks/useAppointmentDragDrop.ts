@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { bookingErrorMessage } from "@/lib/booking-errors";
 
 export interface DragDropTarget {
   staffId: string;
@@ -62,7 +63,7 @@ export function useAppointmentDragDrop(onSuccess: () => void) {
       .eq("id", appt.id);
 
     if (error) {
-      toast.error("Failed to move appointment");
+      toast.error(bookingErrorMessage(error, "Failed to move appointment"));
     } else {
       toast.success("Appointment moved");
       onSuccess();
