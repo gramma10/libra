@@ -405,13 +405,16 @@ export const el: Record<TranslationKey, string> = {
   "day.sun": "Κυρ",
 
   // AI Daily Summary
-  "aiSummary.title": "AI Ημερήσια Σύνοψη",
+  "aiSummary.title": "AI Σύνοψη Εσόδων",
   "aiSummary.subtitle": "Οδηγοί εσόδων, μετρητά vs κάρτα και κορυφαίο προσωπικό",
   "aiSummary.generate": "Δημιουργία",
   "aiSummary.regenerate": "Ανανέωση",
-  "aiSummary.thinking": "Ανάλυση των σημερινών δεδομένων...",
-  "aiSummary.empty": "Πατήστε Δημιουργία για ανάλυση AI της σημερινής απόδοσης.",
+  "aiSummary.thinking": "Ανάλυση δεδομένων...",
+  "aiSummary.empty": "Επιλέξτε ημερομηνία και περίοδο και πατήστε Δημιουργία.",
   "aiSummary.error": "Αδυναμία δημιουργίας σύνοψης",
   "aiSummary.rateLimit": "Πάρα πολλά αιτήματα. Δοκιμάστε σε λίγο.",
   "aiSummary.creditsExhausted": "Τα credits AI εξαντλήθηκαν. Προσθέστε credits.",
+  "aiSummary.period.day": "Ημέρα",
+  "aiSummary.period.week": "Εβδομάδα",
+  "aiSummary.period.month": "Μήνας",
 };

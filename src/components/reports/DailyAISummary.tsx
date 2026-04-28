@@ -1,12 +1,18 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, Loader2, RefreshCw } from "lucide-react";
+import { Sparkles, Loader2, RefreshCw, CalendarIcon } from "lucide-react";
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/hooks/useLanguage";
 import { toast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
-// Minimal markdown renderer for **bold** and line breaks
+type Period = "day" | "week" | "month";
+
 function renderMarkdown(text: string) {
   return text.split("\n").map((line, i) => {
     const parts = line.split(/(\*\*[^*]+\*\*)/g);
@@ -24,17 +30,33 @@ function renderMarkdown(text: string) {
   });
 }
 
+function formatRangeLabel(date: Date, period: Period, locale: string) {
+  const dfmt = locale === "el" ? "d MMM yyyy" : "MMM d, yyyy";
+  if (period === "day") return format(date, dfmt);
+  if (period === "week") {
+    const s = startOfWeek(date, { weekStartsOn: 1 });
+    const e = endOfWeek(date, { weekStartsOn: 1 });
+    return `${format(s, "d MMM")} – ${format(e, dfmt)}`;
+  }
+  const s = startOfMonth(date);
+  const e = endOfMonth(date);
+  return `${format(s, "d")} – ${format(e, dfmt)}`;
+}
+
 export default function DailyAISummary() {
   const { t, locale } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState<string>("");
+  const [period, setPeriod] = useState<Period>("day");
+  const [date, setDate] = useState<Date>(new Date());
+  const [popoverOpen, setPopoverOpen] = useState(false);
 
   const generate = async () => {
     setLoading(true);
     try {
-      const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Athens" });
+      const isoDate = format(date, "yyyy-MM-dd");
       const { data, error } = await supabase.functions.invoke("daily-revenue-summary", {
-        body: { date: today, language: locale },
+        body: { date: isoDate, period, language: locale },
       });
       if (error) {
         const status = (error as any).context?.status;
@@ -65,7 +87,7 @@ export default function DailyAISummary() {
       animate={{ opacity: 1, y: 0 }}
       className="rounded-2xl border border-border bg-gradient-to-br from-primary/5 via-card to-card p-5 shadow-apple"
     >
-      <div className="flex items-start justify-between gap-3 mb-3">
+      <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
         <div className="flex items-center gap-2">
           <div className="rounded-xl p-2 bg-primary/10">
             <Sparkles className="h-4 w-4 text-primary" strokeWidth={2.2} />
@@ -91,6 +113,50 @@ export default function DailyAISummary() {
           )}
           {summary ? t("aiSummary.regenerate") : t("aiSummary.generate")}
         </Button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)}>
+          <TabsList className="h-9 rounded-xl">
+            <TabsTrigger value="day" className="rounded-lg text-xs px-3">
+              {t("aiSummary.period.day")}
+            </TabsTrigger>
+            <TabsTrigger value="week" className="rounded-lg text-xs px-3">
+              {t("aiSummary.period.week")}
+            </TabsTrigger>
+            <TabsTrigger value="month" className="rounded-lg text-xs px-3">
+              {t("aiSummary.period.month")}
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn("rounded-xl gap-2 h-9 font-normal", !date && "text-muted-foreground")}
+            >
+              <CalendarIcon className="h-3.5 w-3.5" />
+              {formatRangeLabel(date, period, locale)}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={date}
+              onSelect={(d) => {
+                if (d) {
+                  setDate(d);
+                  setPopoverOpen(false);
+                }
+              }}
+              disabled={(d) => d > new Date()}
+              initialFocus
+              className={cn("p-3 pointer-events-auto")}
+            />
+          </PopoverContent>
+        </Popover>
       </div>
 
       {loading && !summary && (
