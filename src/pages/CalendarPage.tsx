@@ -56,7 +56,7 @@ export default function CalendarPage() {
     setLoading(true);
     const { start, end } = getDateRange();
     const [apptRes, svcRes, staffRes] = await Promise.all([
-      supabase.from("appointments").select("*, clients(first_name, last_name, phone_mobile, email, personal_preferences, tech_notes), services(service_name, duration, category_color)").gte("start_time", start.toISOString()).lte("start_time", end.toISOString()).order("start_time"),
+      supabase.from("appointments").select("*, clients!appointments_client_fk(first_name, last_name, phone_mobile, email, personal_preferences, tech_notes), services!appointments_service_id_fkey(service_name, duration, category_color)").gte("start_time", start.toISOString()).lte("start_time", end.toISOString()).order("start_time"),
       supabase.from("services").select("*").order("service_name"),
       supabase.from("staff").select("*").eq("is_active", true).order("first_name"),
     ]);

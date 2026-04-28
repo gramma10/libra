@@ -40,7 +40,7 @@ export default function MyStatsPage() {
     const fetchData = async () => {
       setLoading(true);
       const [apptRes, staffRes] = await Promise.all([
-        supabase.from("appointments").select("id, start_time, end_time, status, services(price, service_name), clients(first_name, last_name)").eq("staff_id", staffRecordId).gte("start_time", monthStart).lte("start_time", monthEnd).order("start_time", { ascending: false }),
+        supabase.from("appointments").select("id, start_time, end_time, status, services!appointments_service_id_fkey(price, service_name), clients!appointments_client_fk(first_name, last_name)").eq("staff_id", staffRecordId).gte("start_time", monthStart).lte("start_time", monthEnd).order("start_time", { ascending: false }),
         supabase.from("staff").select("commission_rate, first_name, last_name").eq("id", staffRecordId).single(),
       ]);
       setAppointments((apptRes.data as any[]) || []);

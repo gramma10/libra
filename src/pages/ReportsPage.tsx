@@ -63,10 +63,10 @@ export default function ReportsPage() {
     const endDate = end.toISOString().split("T")[0];
 
     const [apptRes, expRes, staffRes, salesRes] = await Promise.all([
-      supabase.from("appointments").select("id, start_time, end_time, status, is_paid, service_id, staff_id, services(price, service_name)").gte("start_time", start.toISOString()).lte("start_time", end.toISOString()).order("start_time"),
+      supabase.from("appointments").select("id, start_time, end_time, status, is_paid, service_id, staff_id, services!appointments_service_id_fkey(price, service_name)").gte("start_time", start.toISOString()).lte("start_time", end.toISOString()).order("start_time"),
       supabase.from("expenses").select("amount, category").gte("date", startDate).lte("date", endDate),
       supabase.from("staff").select("id, commission_rate"),
-      supabase.from("product_sales").select("total_amount, sale_date, inventory_id, inventory(product_name)").gte("sale_date", startDate).lte("sale_date", endDate),
+      supabase.from("product_sales").select("total_amount, sale_date, inventory_id, inventory!product_sales_inventory_fk(product_name)").gte("sale_date", startDate).lte("sale_date", endDate),
     ]);
     setAppointments((apptRes.data as Appointment[]) || []);
     const expenses = (expRes.data as Expense[]) || [];

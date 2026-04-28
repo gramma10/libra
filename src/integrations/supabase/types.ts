@@ -57,6 +57,27 @@ export type Database = {
             referencedRelation: "services"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "appt_services_appointment_fk"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appt_services_service_fk"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appt_services_shop_fk"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
         ]
       }
       appointments: {
@@ -104,10 +125,24 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "appointments_client_fk"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "appointments_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_service_fk"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
             referencedColumns: ["id"]
           },
           {
@@ -118,10 +153,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "appointments_shop_fk"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "appointments_shop_id_fkey"
             columns: ["shop_id"]
             isOneToOne: false
             referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_staff_fk"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
             referencedColumns: ["id"]
           },
         ]
@@ -170,6 +219,13 @@ export type Database = {
           theme_style?: Database["public"]["Enums"]["theme_style"]
         }
         Relationships: [
+          {
+            foreignKeyName: "business_settings_shop_fk"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "business_settings_shop_id_fkey"
             columns: ["shop_id"]
@@ -227,6 +283,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "clients_shop_fk"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "clients_shop_id_fkey"
             columns: ["shop_id"]
             isOneToOne: false
@@ -281,6 +344,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "expenses_shop_fk"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "expenses_shop_id_fkey"
             columns: ["shop_id"]
             isOneToOne: false
@@ -325,6 +395,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "inventory_shop_fk"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "inventory_shop_id_fkey"
             columns: ["shop_id"]
             isOneToOne: false
@@ -363,10 +440,24 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "invitations_shop_fk"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "invitations_shop_id_fkey"
             columns: ["shop_id"]
             isOneToOne: false
             referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invitations_staff_fk"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
             referencedColumns: ["id"]
           },
           {
@@ -411,10 +502,24 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "product_sales_inventory_fk"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "inventory"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "product_sales_inventory_id_fkey"
             columns: ["inventory_id"]
             isOneToOne: false
             referencedRelation: "inventory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_sales_shop_fk"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
             referencedColumns: ["id"]
           },
           {
@@ -459,6 +564,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "services_shop_fk"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "services_shop_id_fkey"
             columns: ["shop_id"]
             isOneToOne: false
@@ -490,6 +602,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "shop_members_shop_fk"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "shop_members_shop_id_fkey"
             columns: ["shop_id"]
@@ -571,6 +690,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "staff_shop_fk"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "staff_shop_id_fkey"
             columns: ["shop_id"]
             isOneToOne: false
@@ -609,10 +735,24 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "transactions_appointment_fk"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "transactions_appointment_id_fkey"
             columns: ["appointment_id"]
             isOneToOne: false
             referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_shop_fk"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
             referencedColumns: ["id"]
           },
           {

@@ -67,7 +67,7 @@ export default function ClientsPage() {
     // Fetch appointment data for filters (service history, last visit, revenue)
     supabase
       .from("appointments")
-      .select("id, client_id, service_id, start_time, end_time, status, services(price), appointment_services(price, service_id)")
+      .select("id, client_id, service_id, start_time, end_time, status, services!appointments_service_id_fkey(price), appointment_services!appt_services_appointment_fk(price, service_id)")
       .then(({ data }) => {
         const serviceMap: Record<string, Set<string>> = {};
         const lastVisitMap: Record<string, Date> = {};
@@ -114,7 +114,7 @@ export default function ClientsPage() {
       setLoadingAppts(true);
       const { data } = await supabase
         .from("appointments")
-        .select("id, start_time, end_time, status, is_paid, services(price, service_name), appointment_services(price, services(service_name))")
+        .select("id, start_time, end_time, status, is_paid, services!appointments_service_id_fkey(price, service_name), appointment_services!appt_services_appointment_fk(price, services!appt_services_service_fk(service_name))")
         .eq("client_id", selected.id)
         .order("start_time", { ascending: false });
       setClientAppointments(data || []);

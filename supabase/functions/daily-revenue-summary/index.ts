@@ -88,7 +88,7 @@ async function getRangeStats(
     supabase
       .from("appointments")
       .select(
-        "id, status, staff_id, service_id, services(price, service_name)",
+        "id, status, staff_id, service_id, services!appointments_service_id_fkey(price, service_name)",
       )
       .eq("shop_id", shopId)
       .gte("start_time", startISO)
