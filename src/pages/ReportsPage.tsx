@@ -6,6 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import ReportsCalendar from "@/components/reports/ReportsCalendar";
 import StatCard from "@/components/reports/StatCard";
 import RevenuePieChart from "@/components/reports/RevenuePieChart";
+import DailyAISummary from "@/components/reports/DailyAISummary";
 import { useRole } from "@/hooks/useRole";
 import { useLanguage } from "@/hooks/useLanguage";
 import { Button } from "@/components/ui/button";
