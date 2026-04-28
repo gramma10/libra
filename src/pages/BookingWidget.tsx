@@ -256,83 +256,61 @@ export default function BookingWidget() {
     const startDt = new Date(`${formatLocalDate(selectedDate)}T${selectedTime}:00`);
     const endDt = new Date(startDt.getTime() + selectedService.duration * 60000);
 
-    if (staffIdToUse) {
-      const { data: overlapping } = await supabase
-        .from("appointments")
-        .select("id")
-        .eq("staff_id", staffIdToUse)
-        .lt("start_time", endDt.toISOString())
-        .gt("end_time", startDt.toISOString())
-        .limit(1);
-      if (overlapping && overlapping.length > 0) {
-        toast.error("This slot was just booked. Please choose another time.");
-        setSubmitting(false);
-        setStep("time");
-        return;
-      }
+    if (!shopSlug) {
+      toast.error("Shop not found");
+      setSubmitting(false);
+      return;
     }
 
-    let clientId: string;
     const normalizedPhone = normalizePhone(clientInfo.phone_mobile);
-    const { data: existing } = await supabase
-      .from("clients")
-      .select("id")
-      .eq("shop_id", shopId!)
-      .or(`phone_mobile.eq.${clientInfo.phone_mobile},phone_mobile.eq.${normalizedPhone}`)
-      .limit(1)
-      .maybeSingle();
 
-    if (existing) {
-      clientId = existing.id;
-      await supabase.from("clients").update({
-        first_name: clientInfo.first_name,
-        last_name: clientInfo.last_name || "",
-        email: clientInfo.email,
-      }).eq("id", clientId);
-    } else {
-      const { data: newClient, error } = await supabase.from("clients").insert({
-        first_name: clientInfo.first_name,
-        last_name: clientInfo.last_name || "",
-        phone_mobile: normalizedPhone || clientInfo.phone_mobile,
-        email: clientInfo.email,
-        shop_id: shopId!,
-      }).select("id").single();
-      if (error || !newClient) {
-        toast.error("Could not create client: " + (error?.message || "Unknown error"));
-        setSubmitting(false);
-        return;
-      }
-      clientId = newClient.id;
+    // Atomic create: server validates shop, service, and staff scope; exclusion
+    // constraint guarantees no double-booking.
+    const { data: rpcData, error: rpcError } = await supabase.rpc("public_create_booking", {
+      _shop_slug: shopSlug,
+      _service_id: selectedService.id,
+      _staff_id: staffIdToUse || null,
+      _start_time: startDt.toISOString(),
+      _end_time: endDt.toISOString(),
+      _first_name: clientInfo.first_name,
+      _last_name: clientInfo.last_name || "",
+      _email: clientInfo.email,
+      _phone: clientInfo.phone_mobile,
+      _phone_normalized: normalizedPhone || clientInfo.phone_mobile,
+    });
+
+    if (rpcError) {
+      const { bookingErrorMessage } = await import("@/lib/booking-errors");
+      toast.error(bookingErrorMessage(rpcError, rpcError.message));
+      setSubmitting(false);
+      return;
     }
 
-    const { data: newAppointment, error } = await supabase.from("appointments").insert({
-      client_id: clientId,
-      service_id: selectedService.id,
-      staff_id: staffIdToUse || null,
-      start_time: startDt.toISOString(),
-      end_time: endDt.toISOString(),
-      shop_id: shopId!,
-    }).select("*").single();
+    const created = Array.isArray(rpcData) && rpcData.length > 0 ? rpcData[0] : null;
+    toast.success("Booking confirmed!");
+    setStep("confirm");
 
-    if (error) {
-      const { bookingErrorMessage } = await import("@/lib/booking-errors");
-      toast.error(bookingErrorMessage(error, error.message));
-    } else {
-      toast.success("Booking confirmed!");
-      setStep("confirm");
-
-      // Fire-and-forget email confirmation
-      if (newAppointment) {
-        supabase.functions
-          .invoke("send-appointment-email", {
-            body: { record: newAppointment },
-          })
-          .then(({ error: invokeError }) => {
-            if (invokeError) {
-              console.error("Email invocation failed:", invokeError);
-            }
-          });
-      }
+    // Fire-and-forget email confirmation
+    if (created?.appointment_id) {
+      supabase.functions
+        .invoke("send-appointment-email", {
+          body: {
+            record: {
+              id: created.appointment_id,
+              client_id: created.client_id,
+              shop_id: created.shop_id,
+              service_id: selectedService.id,
+              staff_id: staffIdToUse || null,
+              start_time: startDt.toISOString(),
+              end_time: endDt.toISOString(),
+            },
+          },
+        })
+        .then(({ error: invokeError }) => {
+          if (invokeError) {
+            console.error("Email invocation failed:", invokeError);
+          }
+        });
     }
     setSubmitting(false);
   };
