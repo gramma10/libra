@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:rbac": "vitest run --config vitest.rbac.config.ts"
+    "test:rbac": "vitest run --config vitest.rbac.config.ts",
+    "test:jobs": "vitest run --config vitest.rbac.config.ts src/test/jobs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
