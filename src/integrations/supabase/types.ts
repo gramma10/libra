@@ -802,6 +802,42 @@ export type Database = {
         }
         Returns: boolean
       }
+      public_create_booking: {
+        Args: {
+          _email: string
+          _end_time: string
+          _first_name: string
+          _last_name: string
+          _phone: string
+          _phone_normalized: string
+          _service_id: string
+          _shop_slug: string
+          _staff_id: string
+          _start_time: string
+        }
+        Returns: {
+          appointment_id: string
+          client_id: string
+          shop_id: string
+        }[]
+      }
+      public_get_booked_slots: {
+        Args: { _date: string; _shop_slug: string }
+        Returns: {
+          end_time: string
+          staff_id: string
+          start_time: string
+        }[]
+      }
+      public_lookup_client: {
+        Args: { _phone: string; _phone_normalized: string; _shop_slug: string }
+        Returns: {
+          email: string
+          first_name: string
+          id: string
+          last_name: string
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "manager" | "staff"
