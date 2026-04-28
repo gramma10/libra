@@ -104,17 +104,21 @@ export default function BookingWidget() {
 
   useEffect(() => {
     const init = async () => {
-      // Resolve shop_id from slug or use first available
+      // Resolve shop_id + slug from URL slug or fall back to first available
       let resolvedShopId: string | null = null;
+      let resolvedSlug: string | null = null;
       if (slug) {
-        const { data: shop } = await supabase.from("shops").select("id").eq("slug", slug).maybeSingle();
+        const { data: shop } = await supabase.from("shops").select("id, slug").eq("slug", slug).maybeSingle();
         resolvedShopId = shop?.id || null;
+        resolvedSlug = shop?.slug || null;
       }
       if (!resolvedShopId) {
-        const { data: shop } = await supabase.from("shops").select("id").limit(1).single();
+        const { data: shop } = await supabase.from("shops").select("id, slug").limit(1).single();
         resolvedShopId = shop?.id || null;
+        resolvedSlug = shop?.slug || null;
       }
       setShopId(resolvedShopId);
+      setShopSlug(resolvedSlug);
 
       const filter = resolvedShopId ? { shop_id: resolvedShopId } : {};
       const [svcRes, staffRes, settingsRes] = await Promise.all([
