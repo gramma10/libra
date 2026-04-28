@@ -150,22 +150,21 @@ export default function BookingWidget() {
 
   useEffect(() => {
     const normalized = normalizePhone(clientInfo.phone_mobile);
-    if (normalized.length < 5 || !shopId) { setPhoneLookupDone(false); setClientFound(false); return; }
+    if (normalized.length < 5 || !shopSlug) { setPhoneLookupDone(false); setClientFound(false); return; }
     const timer = setTimeout(async () => {
       setLookingUpPhone(true);
-      const { data } = await supabase
-        .from("clients")
-        .select("id, first_name, last_name, email, phone_mobile")
-        .eq("shop_id", shopId)
-        .or(`phone_mobile.eq.${clientInfo.phone_mobile},phone_mobile.eq.${normalized}`)
-        .limit(1)
-        .maybeSingle();
-      if (data) {
+      const { data } = await supabase.rpc("public_lookup_client", {
+        _shop_slug: shopSlug,
+        _phone: clientInfo.phone_mobile,
+        _phone_normalized: normalized,
+      });
+      const found = Array.isArray(data) && data.length > 0 ? data[0] : null;
+      if (found) {
         setClientInfo((prev) => ({
           ...prev,
-          first_name: data.first_name || prev.first_name,
-          last_name: data.last_name || prev.last_name,
-          email: data.email || prev.email,
+          first_name: found.first_name || prev.first_name,
+          last_name: found.last_name || prev.last_name,
+          email: found.email || prev.email,
         }));
         setClientFound(true);
       } else {
@@ -175,7 +174,7 @@ export default function BookingWidget() {
       setLookingUpPhone(false);
     }, 500);
     return () => clearTimeout(timer);
-  }, [clientInfo.phone_mobile, shopId]);
+  }, [clientInfo.phone_mobile, shopSlug]);
 
   useEffect(() => {
     if (!selectedDate || !selectedStaff) return;
