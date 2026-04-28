@@ -99,7 +99,7 @@ export default function EditBookingDialog({ open, onOpenChange, appointment, ser
     }).eq("id", appointment.id);
 
     if (error) {
-      toast.error(error.message);
+      toast.error(bookingErrorMessage(error, error.message));
       setSaving(false);
       return;
     }
