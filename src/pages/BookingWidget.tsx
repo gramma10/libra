@@ -39,6 +39,7 @@ type Step = "service" | "barber" | "date" | "time" | "info" | "confirm";
 export default function BookingWidget() {
   const { slug } = useParams<{ slug: string }>();
   const [shopId, setShopId] = useState<string | null>(null);
+  const [shopSlug, setShopSlug] = useState<string | null>(null);
   const [step, setStep] = useState<Step>("service");
   const [services, setServices] = useState<any[]>([]);
   const [staffList, setStaffList] = useState<any[]>([]);
@@ -103,17 +104,21 @@ export default function BookingWidget() {
 
   useEffect(() => {
     const init = async () => {
-      // Resolve shop_id from slug or use first available
+      // Resolve shop_id + slug from URL slug or fall back to first available
       let resolvedShopId: string | null = null;
+      let resolvedSlug: string | null = null;
       if (slug) {
-        const { data: shop } = await supabase.from("shops").select("id").eq("slug", slug).maybeSingle();
+        const { data: shop } = await supabase.from("shops").select("id, slug").eq("slug", slug).maybeSingle();
         resolvedShopId = shop?.id || null;
+        resolvedSlug = shop?.slug || null;
       }
       if (!resolvedShopId) {
-        const { data: shop } = await supabase.from("shops").select("id").limit(1).single();
+        const { data: shop } = await supabase.from("shops").select("id, slug").limit(1).single();
         resolvedShopId = shop?.id || null;
+        resolvedSlug = shop?.slug || null;
       }
       setShopId(resolvedShopId);
+      setShopSlug(resolvedSlug);
 
       const filter = resolvedShopId ? { shop_id: resolvedShopId } : {};
       const [svcRes, staffRes, settingsRes] = await Promise.all([
@@ -145,22 +150,21 @@ export default function BookingWidget() {
 
   useEffect(() => {
     const normalized = normalizePhone(clientInfo.phone_mobile);
-    if (normalized.length < 5 || !shopId) { setPhoneLookupDone(false); setClientFound(false); return; }
+    if (normalized.length < 5 || !shopSlug) { setPhoneLookupDone(false); setClientFound(false); return; }
     const timer = setTimeout(async () => {
       setLookingUpPhone(true);
-      const { data } = await supabase
-        .from("clients")
-        .select("id, first_name, last_name, email, phone_mobile")
-        .eq("shop_id", shopId)
-        .or(`phone_mobile.eq.${clientInfo.phone_mobile},phone_mobile.eq.${normalized}`)
-        .limit(1)
-        .maybeSingle();
-      if (data) {
+      const { data } = await supabase.rpc("public_lookup_client", {
+        _shop_slug: shopSlug,
+        _phone: clientInfo.phone_mobile,
+        _phone_normalized: normalized,
+      });
+      const found = Array.isArray(data) && data.length > 0 ? data[0] : null;
+      if (found) {
         setClientInfo((prev) => ({
           ...prev,
-          first_name: data.first_name || prev.first_name,
-          last_name: data.last_name || prev.last_name,
-          email: data.email || prev.email,
+          first_name: found.first_name || prev.first_name,
+          last_name: found.last_name || prev.last_name,
+          email: found.email || prev.email,
         }));
         setClientFound(true);
       } else {
@@ -170,31 +174,30 @@ export default function BookingWidget() {
       setLookingUpPhone(false);
     }, 500);
     return () => clearTimeout(timer);
-  }, [clientInfo.phone_mobile, shopId]);
+  }, [clientInfo.phone_mobile, shopSlug]);
 
   useEffect(() => {
-    if (!selectedDate || !selectedStaff) return;
+    if (!selectedDate || !selectedStaff || !shopSlug) return;
     const fetchSlots = async () => {
       setLoadingSlots(true);
-      const dayStart = new Date(selectedDate);
-      dayStart.setHours(0, 0, 0, 0);
-      const dayEnd = new Date(selectedDate);
-      dayEnd.setHours(23, 59, 59, 999);
-
-      let query = supabase.from("appointments").select("start_time, end_time, staff_id")
-        .gte("start_time", dayStart.toISOString())
-        .lte("start_time", dayEnd.toISOString());
-
-      if (selectedStaff.id !== "anyone") {
-        query = query.eq("staff_id", selectedStaff.id);
-      }
-
-      const { data } = await query;
-      setBookedSlots((data || []).map((a: any) => ({ start: new Date(a.start_time), end: new Date(a.end_time), staffId: a.staff_id })));
+      const dateStr = formatLocalDate(selectedDate);
+      const { data } = await supabase.rpc("public_get_booked_slots", {
+        _shop_slug: shopSlug,
+        _date: dateStr,
+      });
+      const all = (data || []) as Array<{ start_time: string; end_time: string; staff_id: string | null }>;
+      const filtered = selectedStaff.id !== "anyone"
+        ? all.filter((a) => a.staff_id === selectedStaff.id)
+        : all;
+      setBookedSlots(filtered.map((a) => ({
+        start: new Date(a.start_time),
+        end: new Date(a.end_time),
+        staffId: a.staff_id as any,
+      })));
       setLoadingSlots(false);
     };
     fetchSlots();
-  }, [selectedDate, selectedStaff]);
+  }, [selectedDate, selectedStaff, shopSlug]);
 
   const isSlotAvailable = (time: string): boolean => {
     if (!selectedDate || !selectedService) return true;
@@ -253,83 +256,61 @@ export default function BookingWidget() {
     const startDt = new Date(`${formatLocalDate(selectedDate)}T${selectedTime}:00`);
     const endDt = new Date(startDt.getTime() + selectedService.duration * 60000);
 
-    if (staffIdToUse) {
-      const { data: overlapping } = await supabase
-        .from("appointments")
-        .select("id")
-        .eq("staff_id", staffIdToUse)
-        .lt("start_time", endDt.toISOString())
-        .gt("end_time", startDt.toISOString())
-        .limit(1);
-      if (overlapping && overlapping.length > 0) {
-        toast.error("This slot was just booked. Please choose another time.");
-        setSubmitting(false);
-        setStep("time");
-        return;
-      }
+    if (!shopSlug) {
+      toast.error("Shop not found");
+      setSubmitting(false);
+      return;
     }
 
-    let clientId: string;
     const normalizedPhone = normalizePhone(clientInfo.phone_mobile);
-    const { data: existing } = await supabase
-      .from("clients")
-      .select("id")
-      .eq("shop_id", shopId!)
-      .or(`phone_mobile.eq.${clientInfo.phone_mobile},phone_mobile.eq.${normalizedPhone}`)
-      .limit(1)
-      .maybeSingle();
 
-    if (existing) {
-      clientId = existing.id;
-      await supabase.from("clients").update({
-        first_name: clientInfo.first_name,
-        last_name: clientInfo.last_name || "",
-        email: clientInfo.email,
-      }).eq("id", clientId);
-    } else {
-      const { data: newClient, error } = await supabase.from("clients").insert({
-        first_name: clientInfo.first_name,
-        last_name: clientInfo.last_name || "",
-        phone_mobile: normalizedPhone || clientInfo.phone_mobile,
-        email: clientInfo.email,
-        shop_id: shopId!,
-      }).select("id").single();
-      if (error || !newClient) {
-        toast.error("Could not create client: " + (error?.message || "Unknown error"));
-        setSubmitting(false);
-        return;
-      }
-      clientId = newClient.id;
+    // Atomic create: server validates shop, service, and staff scope; exclusion
+    // constraint guarantees no double-booking.
+    const { data: rpcData, error: rpcError } = await supabase.rpc("public_create_booking", {
+      _shop_slug: shopSlug,
+      _service_id: selectedService.id,
+      _staff_id: staffIdToUse || null,
+      _start_time: startDt.toISOString(),
+      _end_time: endDt.toISOString(),
+      _first_name: clientInfo.first_name,
+      _last_name: clientInfo.last_name || "",
+      _email: clientInfo.email,
+      _phone: clientInfo.phone_mobile,
+      _phone_normalized: normalizedPhone || clientInfo.phone_mobile,
+    });
+
+    if (rpcError) {
+      const { bookingErrorMessage } = await import("@/lib/booking-errors");
+      toast.error(bookingErrorMessage(rpcError, rpcError.message));
+      setSubmitting(false);
+      return;
     }
 
-    const { data: newAppointment, error } = await supabase.from("appointments").insert({
-      client_id: clientId,
-      service_id: selectedService.id,
-      staff_id: staffIdToUse || null,
-      start_time: startDt.toISOString(),
-      end_time: endDt.toISOString(),
-      shop_id: shopId!,
-    }).select("*").single();
+    const created = Array.isArray(rpcData) && rpcData.length > 0 ? rpcData[0] : null;
+    toast.success("Booking confirmed!");
+    setStep("confirm");
 
-    if (error) {
-      const { bookingErrorMessage } = await import("@/lib/booking-errors");
-      toast.error(bookingErrorMessage(error, error.message));
-    } else {
-      toast.success("Booking confirmed!");
-      setStep("confirm");
-
-      // Fire-and-forget email confirmation
-      if (newAppointment) {
-        supabase.functions
-          .invoke("send-appointment-email", {
-            body: { record: newAppointment },
-          })
-          .then(({ error: invokeError }) => {
-            if (invokeError) {
-              console.error("Email invocation failed:", invokeError);
-            }
-          });
-      }
+    // Fire-and-forget email confirmation
+    if (created?.appointment_id) {
+      supabase.functions
+        .invoke("send-appointment-email", {
+          body: {
+            record: {
+              id: created.appointment_id,
+              client_id: created.client_id,
+              shop_id: created.shop_id,
+              service_id: selectedService.id,
+              staff_id: staffIdToUse || null,
+              start_time: startDt.toISOString(),
+              end_time: endDt.toISOString(),
+            },
+          },
+        })
+        .then(({ error: invokeError }) => {
+          if (invokeError) {
+            console.error("Email invocation failed:", invokeError);
+          }
+        });
     }
     setSubmitting(false);
   };
