@@ -39,6 +39,7 @@ type Step = "service" | "barber" | "date" | "time" | "info" | "confirm";
 export default function BookingWidget() {
   const { slug } = useParams<{ slug: string }>();
   const [shopId, setShopId] = useState<string | null>(null);
+  const [shopSlug, setShopSlug] = useState<string | null>(null);
   const [step, setStep] = useState<Step>("service");
   const [services, setServices] = useState<any[]>([]);
   const [staffList, setStaffList] = useState<any[]>([]);
