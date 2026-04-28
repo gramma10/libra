@@ -63,7 +63,7 @@ export function useAppointmentDragDrop(onSuccess: () => void) {
       .eq("id", appt.id);
 
     if (error) {
-      toast.error("Failed to move appointment");
+      toast.error(bookingErrorMessage(error, "Failed to move appointment"));
     } else {
       toast.success("Appointment moved");
       onSuccess();
