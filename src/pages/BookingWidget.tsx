@@ -177,28 +177,27 @@ export default function BookingWidget() {
   }, [clientInfo.phone_mobile, shopSlug]);
 
   useEffect(() => {
-    if (!selectedDate || !selectedStaff) return;
+    if (!selectedDate || !selectedStaff || !shopSlug) return;
     const fetchSlots = async () => {
       setLoadingSlots(true);
-      const dayStart = new Date(selectedDate);
-      dayStart.setHours(0, 0, 0, 0);
-      const dayEnd = new Date(selectedDate);
-      dayEnd.setHours(23, 59, 59, 999);
-
-      let query = supabase.from("appointments").select("start_time, end_time, staff_id")
-        .gte("start_time", dayStart.toISOString())
-        .lte("start_time", dayEnd.toISOString());
-
-      if (selectedStaff.id !== "anyone") {
-        query = query.eq("staff_id", selectedStaff.id);
-      }
-
-      const { data } = await query;
-      setBookedSlots((data || []).map((a: any) => ({ start: new Date(a.start_time), end: new Date(a.end_time), staffId: a.staff_id })));
+      const dateStr = formatLocalDate(selectedDate);
+      const { data } = await supabase.rpc("public_get_booked_slots", {
+        _shop_slug: shopSlug,
+        _date: dateStr,
+      });
+      const all = (data || []) as Array<{ start_time: string; end_time: string; staff_id: string | null }>;
+      const filtered = selectedStaff.id !== "anyone"
+        ? all.filter((a) => a.staff_id === selectedStaff.id)
+        : all;
+      setBookedSlots(filtered.map((a) => ({
+        start: new Date(a.start_time),
+        end: new Date(a.end_time),
+        staffId: a.staff_id as any,
+      })));
       setLoadingSlots(false);
     };
     fetchSlots();
-  }, [selectedDate, selectedStaff]);
+  }, [selectedDate, selectedStaff, shopSlug]);
 
   const isSlotAvailable = (time: string): boolean => {
     if (!selectedDate || !selectedService) return true;
