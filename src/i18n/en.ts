@@ -401,6 +401,17 @@ export const en = {
   "day.fri": "Fri",
   "day.sat": "Sat",
   "day.sun": "Sun",
+
+  // AI Daily Summary
+  "aiSummary.title": "AI Daily Summary",
+  "aiSummary.subtitle": "Today's revenue drivers, cash vs card, and top staff",
+  "aiSummary.generate": "Generate",
+  "aiSummary.regenerate": "Regenerate",
+  "aiSummary.thinking": "Analyzing today's numbers...",
+  "aiSummary.empty": "Click Generate to get an AI breakdown of today's performance.",
+  "aiSummary.error": "Could not generate summary",
+  "aiSummary.rateLimit": "Too many requests. Please wait a moment.",
+  "aiSummary.creditsExhausted": "AI credits exhausted. Add credits to continue.",
 } as const;
 
 export type TranslationKey = keyof typeof en;
