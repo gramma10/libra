@@ -132,7 +132,7 @@ export default function NewBookingDialog({ open, onOpenChange, currentDate, pref
         .single();
 
       if (insertError) {
-        toast.error(insertError.message);
+        toast.error(bookingErrorMessage(insertError, insertError.message));
         setSaving(false);
         return;
       }
