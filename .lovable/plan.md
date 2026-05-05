@@ -1,60 +1,43 @@
+# Plan: Analytical Project Report (Markdown)
 
+## Goal
+Produce a single, polished markdown document at `/mnt/documents/project-report.md` that explains, for a business / non-technical reader, what this project is and everything it consists of.
 
-## Root Cause Analysis
+## Source material (already in context — no further exploration needed)
+- Memory index (29 referenced memory files covering auth, RBAC, scheduling, CRM, finance, inventory, SMS, email, jobs, i18n, design, responsive UX).
+- Supabase schema (14 tables with RLS) and project URLs.
+- App routing (`src/App.tsx`) showing every page in the dashboard.
+- Edge functions list (`check-reminders`, `create-staff-user`, `daily-revenue-summary`, `send-apifon-sms`, `send-appointment-email`).
+- Recent hardening work: booking concurrency control, RLS verification, RBAC cross-tenant tests, deterministic background jobs.
 
-The bug is a **race condition** between the invite acceptance and the shop-loading state. Here's what happens:
+## Report structure (≈10–15 pages, business tone)
 
-1. New employee signs up, lands on `/` via ProtectedRoute
-2. ProtectedRoute's useEffect correctly finds the `pending_invite_code` and calls `accept_invitation` RPC -- **this succeeds**
-3. After success, it calls `refetch()` to refresh the shop context, then **immediately** sets `acceptingInvite = false` in the `finally` block
-4. But `refetch()` is async and `fetchShop` in `useShop` **never sets `loading: true`** when called as a refetch (only the initial state is `loading: true`)
-5. So the component re-renders with: `acceptingInvite=false`, `shopLoading=false`, `hasShop=false` (refetch hasn't completed yet)
-6. This hits the `if (!hasShop) return <Navigate to="/onboarding" />` redirect before the refetch resolves
+1. **Executive Summary** — one-paragraph "what is this product".
+2. **Product Overview** — multi-tenant salon/beauty business management SaaS; who uses it; core value.
+3. **User Roles & Access** — Admin / Manager / Staff, what each can do, onboarding via Creator Code, staff provisioning.
+4. **Core Modules** (one subsection each, plain language):
+   - Calendar & Scheduler
+   - Online Booking Widget (public `/book/:slug`)
+   - Client CRM
+   - Services & Staff Management
+   - Inventory & Product Sales
+   - Expenses & Financial Reports (Net Profit engine)
+   - Staff "My Stats" Dashboard
+   - Notifications (low-stock alerts)
+   - Business Profile, Branding & Theme Customizer
+   - Internationalization (English/Greek)
+5. **Automated Background Operations** — SMS reminders (Apifon), email confirmations (Resend), auto-completion of past appointments, low-stock scans, daily revenue summary, retry logic.
+6. **Security & Multi-Tenancy** — strict shop_id isolation, RLS on every table, anon lockdown, public booking via secure RPCs, automated cross-tenant test suite.
+7. **Technology Stack** — React + Vite + Tailwind + shadcn-ui frontend; Lovable Cloud (Postgres + Auth + Edge Functions + Storage); pg_cron schedules; Recharts; Lovable AI for daily summaries.
+8. **Data Model Snapshot** — plain-language table of the 14 main entities and what each holds.
+9. **Quality & Testing** — Vitest unit suite, RBAC integration suite, background-jobs suite.
+10. **Design System** — minimalist Fresha/Apple aesthetic, Inter/Geist, glassmorphism, responsive (mobile drawers, horizontal tables).
+11. **Operational Defaults & Conventions** — Europe/Athens timezone, 15-min slots, 30-day booking window, phone-first client identity.
+12. **Deployment** — preview + published URLs, automatic edge-function deploy.
+13. **Strengths & Notable Choices** and **Potential Next Steps** (short, neutral).
 
-## Plan
+## Deliverable
+- File: `/mnt/documents/project-report.md`
+- Followed by a `<lov-artifact>` tag so you can download it.
 
-### 1. Fix `useShop.tsx` -- set loading on refetch
-
-Update `fetchShop` to set `loading: true` at the start of every call (not just the initial state). This ensures the ProtectedRoute spinner stays active while the shop data is being re-fetched.
-
-```typescript
-const fetchShop = useCallback(async () => {
-  setState(prev => ({ ...prev, loading: true }));  // ADD THIS LINE
-  if (!user) { ... }
-  // rest unchanged
-```
-
-### 2. Fix `ProtectedRoute.tsx` -- await refetch before clearing state
-
-Move `setAcceptingInvite(false)` **after** `refetch()` completes, not in the `finally` block. This prevents the brief window where both `acceptingInvite` and `hasShop` are false.
-
-```typescript
-const accept = async () => {
-  setAcceptingInvite(true);
-  try {
-    const { error } = await supabase.rpc("accept_invitation", { _invite_code: pendingCode });
-    if (error) throw error;
-    localStorage.removeItem("pending_invite_code");
-    toast.success("Welcome to the team!");
-    await refetch();          // AWAIT the refetch
-  } catch (e: any) {
-    console.error("Failed to accept invitation:", e);
-    localStorage.removeItem("pending_invite_code");
-    toast.error(e.message || "Failed to accept invitation");
-  } finally {
-    setAcceptingInvite(false);
-    setInviteHandled(true);
-  }
-};
-```
-
-The key change is making `refetch` return a promise and awaiting it, so the `finally` block only runs after `hasShop` has been updated in state.
-
-### 3. Make `fetchShop` return a Promise properly
-
-The `refetch` function is just `fetchShop` which is already async, so it already returns a Promise -- it just needs to be awaited in ProtectedRoute. No change needed in `useShop` beyond adding the loading state reset.
-
-### Files to modify
-- `src/hooks/useShop.tsx` (1 line addition)
-- `src/components/ProtectedRoute.tsx` (add `await` to `refetch()`)
-
+No code changes, no DB changes — pure documentation.
