@@ -846,7 +846,15 @@ export type Database = {
     Functions: {
       accept_invitation: { Args: { _invite_code: string }; Returns: Json }
       auto_complete_past_appointments: { Args: never; Returns: undefined }
-      create_shop: { Args: { _name: string; _slug: string }; Returns: string }
+      create_shop: {
+        Args: {
+          _address?: string | null
+          _creator_code: string
+          _name: string
+          _slug: string
+        }
+        Returns: string
+      }
       get_user_role: { Args: { _user_id: string }; Returns: string }
       get_user_shop_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
@@ -882,6 +890,10 @@ export type Database = {
           staff_id: string
           start_time: string
         }[]
+      }
+      public_get_booking_bootstrap: {
+        Args: { _slug: string }
+        Returns: Json
       }
       public_lookup_client: {
         Args: { _phone: string; _phone_normalized: string; _shop_slug: string }

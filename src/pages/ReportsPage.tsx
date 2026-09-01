@@ -8,8 +8,11 @@ import StatCard from "@/components/reports/StatCard";
 import RevenuePieChart from "@/components/reports/RevenuePieChart";
 import DailyAISummary from "@/components/reports/DailyAISummary";
 import { useRole } from "@/hooks/useRole";
+import { useShop } from "@/hooks/useShop";
 import { useLanguage } from "@/hooks/useLanguage";
 import { Button } from "@/components/ui/button";
+import { ALL_SCOPE, applyShopScope } from "@/lib/shopScope";
+import FranchiseReportsPage from "@/pages/FranchiseReportsPage";
 
 const formatCurrency = (v: number) => `€${v.toFixed(0)}`;
 
@@ -31,7 +34,14 @@ const sumRevenue = (appts: Appointment[], now: Date) =>
 type ViewMode = "month" | "year";
 
 export default function ReportsPage() {
+  const { isFranchise, scope } = useShop();
+  if (isFranchise && scope === ALL_SCOPE) return <FranchiseReportsPage />;
+  return <SingleShopReportsPage />;
+}
+
+function SingleShopReportsPage() {
   const { isAdmin } = useRole();
+  const { scope } = useShop();
   const { t, locale } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [viewDate, setViewDate] = useState(new Date());
@@ -63,10 +73,28 @@ export default function ReportsPage() {
     const endDate = end.toISOString().split("T")[0];
 
     const [apptRes, expRes, staffRes, salesRes] = await Promise.all([
-      supabase.from("appointments").select("id, start_time, end_time, status, is_paid, service_id, staff_id, services!appointments_service_id_fkey(price, service_name)").gte("start_time", start.toISOString()).lte("start_time", end.toISOString()).order("start_time"),
-      supabase.from("expenses").select("amount, category").gte("date", startDate).lte("date", endDate),
-      supabase.from("staff").select("id, commission_rate"),
-      supabase.from("product_sales").select("total_amount, sale_date, inventory_id, inventory!product_sales_inventory_fk(product_name)").gte("sale_date", startDate).lte("sale_date", endDate),
+      applyShopScope(
+        supabase
+          .from("appointments")
+          .select("id, start_time, end_time, status, is_paid, service_id, staff_id, services!appointments_service_id_fkey(price, service_name)")
+          .gte("start_time", start.toISOString())
+          .lte("start_time", end.toISOString())
+          .order("start_time"),
+        scope,
+      ),
+      applyShopScope(
+        supabase.from("expenses").select("amount, category").gte("date", startDate).lte("date", endDate),
+        scope,
+      ),
+      applyShopScope(supabase.from("staff").select("id, commission_rate"), scope),
+      applyShopScope(
+        supabase
+          .from("product_sales")
+          .select("total_amount, sale_date, inventory_id, inventory!product_sales_inventory_fk(product_name)")
+          .gte("sale_date", startDate)
+          .lte("sale_date", endDate),
+        scope,
+      ),
     ]);
     setAppointments((apptRes.data as Appointment[]) || []);
     const expenses = (expRes.data as Expense[]) || [];
@@ -79,7 +107,7 @@ export default function ReportsPage() {
     setStaffMap(map);
     setProductSales((salesRes.data as ProductSale[]) || []);
     setLoading(false);
-  }, [viewDate, viewMode]);
+  }, [viewDate, viewMode, scope]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

@@ -415,6 +415,16 @@ export const en = {
   "aiSummary.period.day": "Day",
   "aiSummary.period.week": "Week",
   "aiSummary.period.month": "Month",
+
+  // Franchise
+  "franchise.franchiseOverview": "Franchise Overview",
+  "franchise.allShops": "All shops",
+  "franchise.selectShop": "Select shop",
+  "franchise.switchShop": "Switch shop",
+  "franchise.shop": "Shop",
+  "franchise.shopRequired": "Please pick a shop",
+  "franchise.perShopRevenueTitle": "Revenue by shop",
+  "franchise.lowStockBanner": "Low stock across the franchise",
 } as const;
 
 export type TranslationKey = keyof typeof en;

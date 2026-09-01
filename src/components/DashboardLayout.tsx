@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Outlet } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useShop } from "@/hooks/useShop";
 import {
@@ -13,18 +13,33 @@ import { useRole } from "@/hooks/useRole";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { ShopSwitcher } from "@/components/franchise/ShopSwitcher";
+import { ALL_SCOPE } from "@/lib/shopScope";
 
 export default function DashboardLayout() {
   const { signOut } = useAuth();
-  const { shopName } = useShop();
+  const { shopName, isFranchise, scope } = useShop();
   const [collapsed, setCollapsed] = useState(false);
   const { isAdmin, isManager, isStaff, loading: roleLoading } = useRole();
   const { language, setLanguage, t } = useLanguage();
   const isMobile = useIsMobile();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  const navItems = [];
-  navItems.push({ to: "/", icon: CalendarDays, label: t("sidebar.calendar") });
+  const inFranchiseAllScope = isFranchise && scope === ALL_SCOPE;
+
+  // Franchise overview: Calendar isn't useful, redirect away from /
+  useEffect(() => {
+    if (inFranchiseAllScope && location.pathname === "/") {
+      navigate("/reports", { replace: true });
+    }
+  }, [inFranchiseAllScope, location.pathname, navigate]);
+
+  const navItems: { to: string; icon: typeof CalendarDays; label: string }[] = [];
+  if (!inFranchiseAllScope) {
+    navItems.push({ to: "/", icon: CalendarDays, label: t("sidebar.calendar") });
+  }
   if (isAdmin || isManager) navItems.push({ to: "/clients", icon: Users, label: t("sidebar.clients") });
   if (isAdmin) navItems.push({ to: "/services", icon: Sparkles, label: t("sidebar.services") });
   if (isAdmin) navItems.push({ to: "/staff", icon: UserCog, label: t("sidebar.employees") });
@@ -34,15 +49,19 @@ export default function DashboardLayout() {
   if (isStaff) navItems.push({ to: "/my-stats", icon: User, label: t("sidebar.myStats") });
   if (isAdmin) navItems.push({ to: "/settings", icon: Settings, label: t("sidebar.settings") });
 
+  const headerLabel = (
+    isFranchise
+      ? <ShopSwitcher />
+      : <span className="text-base font-semibold tracking-tight text-foreground truncate">{shopName || "Studio"}</span>
+  );
+
   const sidebarContent = (
     <>
       <div className="flex h-16 items-center gap-2.5 border-b border-border/50 px-4">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary">
           <ScissorsIcon className="h-4 w-4 text-primary-foreground" strokeWidth={1.5} />
         </div>
-        <span className="text-base font-semibold tracking-tight text-foreground truncate">
-          {shopName || "Studio"}
-        </span>
+        <div className="min-w-0 flex-1">{headerLabel}</div>
       </div>
 
       <nav className="flex flex-1 flex-col gap-1 p-3 overflow-y-auto">
@@ -80,13 +99,19 @@ export default function DashboardLayout() {
           <button onClick={() => setMobileOpen(true)} className="p-1.5 rounded-lg hover:bg-accent transition-colors">
             <Menu className="h-5 w-5" strokeWidth={1.5} />
           </button>
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary">
               <ScissorsIcon className="h-3.5 w-3.5 text-primary-foreground" strokeWidth={1.5} />
             </div>
-            <span className="text-sm font-semibold tracking-tight text-foreground truncate">
-              {shopName || "Studio"}
-            </span>
+            <div className="min-w-0 flex-1">
+              {isFranchise ? (
+                <ShopSwitcher />
+              ) : (
+                <span className="text-sm font-semibold tracking-tight text-foreground truncate">
+                  {shopName || "Studio"}
+                </span>
+              )}
+            </div>
           </div>
         </header>
 
@@ -116,11 +141,7 @@ export default function DashboardLayout() {
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary">
             <ScissorsIcon className="h-4 w-4 text-primary-foreground" strokeWidth={1.5} />
           </div>
-          {!collapsed && (
-            <span className="text-base font-semibold tracking-tight text-foreground truncate">
-              {shopName || "Studio"}
-            </span>
-          )}
+          {!collapsed && <div className="min-w-0 flex-1">{headerLabel}</div>}
         </div>
 
         <nav className="flex flex-1 flex-col gap-1 p-3">

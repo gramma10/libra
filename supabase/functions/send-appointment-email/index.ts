@@ -7,36 +7,112 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+
+/**
+ * Deployed with verify_jwt = false, so the caller is authenticated here.
+ * The anon key is public and carries no `sub`, so it is not accepted.
+ */
+async function resolveCallerUserId(
+  supabaseUrl: string,
+  anonKey: string,
+  token: string,
+): Promise<string | null> {
+  if (!supabaseUrl || !anonKey || !token) return null;
+  const caller = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  });
+
+  try {
+    const { data } = await caller.auth.getClaims(token);
+    if (data?.claims?.sub) return data.claims.sub as string;
+  } catch {
+    // getClaims not available in this client build — fall through to getUser.
+  }
+
+  try {
+    const { data } = await caller.auth.getUser(token);
+    if (data?.user?.id) return data.user.id;
+  } catch {
+    // ignore
+  }
+
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  const resendApiKey = Deno.env.get("RESEND_API_KEY");
+
+  const bearer = (req.headers.get("Authorization") ?? "")
+    .replace(/^Bearer\s+/i, "")
+    .trim();
+
+  if (!bearer) return json({ error: "Unauthorized" }, 401);
+
+  const isInternal = !!serviceRoleKey && bearer === serviceRoleKey;
+  let callerUserId: string | null = null;
+  if (!isInternal) {
+    callerUserId = await resolveCallerUserId(supabaseUrl, anonKey, bearer);
+    if (!callerUserId) return json({ error: "Unauthorized" }, 401);
+  }
+
   try {
-    const { record } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const appointmentId: string | null =
+      body?.appointment_id ?? body?.record?.id ?? null;
 
-    if (!record) {
-      console.warn("No record in payload");
-      return new Response(JSON.stringify({ ok: true, skipped: "no_record" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (!appointmentId) {
+      console.warn("No appointment id in payload");
+      return json({ ok: true, skipped: "no_appointment_id" });
     }
-
-    const { client_id, shop_id, staff_id, service_id, start_time, end_time } = record;
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const resendApiKey = Deno.env.get("RESEND_API_KEY");
 
     if (!resendApiKey) {
       console.error("RESEND_API_KEY not configured");
-      return new Response(
-        JSON.stringify({ error: "RESEND_API_KEY not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return json({ error: "RESEND_API_KEY not configured" }, 500);
     }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+    // Never trust ids supplied by the caller: re-read the appointment with the
+    // service role and derive shop_id / client_id from the database row. This
+    // is what stops a signed-in user of shop A from emailing shop B's clients.
+    const { data: appointment } = await supabase
+      .from("appointments")
+      .select("id, client_id, shop_id, staff_id, service_id, start_time, end_time")
+      .eq("id", appointmentId)
+      .maybeSingle();
+
+    if (!appointment) {
+      console.warn(`Appointment ${appointmentId} not found`);
+      return json({ ok: true, skipped: "appointment_not_found" });
+    }
+
+    const { client_id, shop_id, staff_id, service_id, start_time, end_time } =
+      appointment as any;
+
+    if (!isInternal) {
+      const { data: membership } = await supabase
+        .from("shop_members")
+        .select("user_id")
+        .eq("user_id", callerUserId)
+        .eq("shop_id", shop_id)
+        .maybeSingle();
+
+      if (!membership) {
+        return json({ error: "Forbidden" }, 403);
+      }
+    }
 
     const [clientRes, shopRes, staffRes, serviceRes, settingsRes] =
       await Promise.all([

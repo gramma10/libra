@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { Upload, X, Loader2, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { useShop } from "@/hooks/useShop";
 import { toast } from "sonner";
 
 interface LogoUploaderProps {
@@ -12,6 +13,7 @@ interface LogoUploaderProps {
 export default function LogoUploader({ logoUrl, onLogoChange }: LogoUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const { shopId } = useShop();
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -25,9 +27,16 @@ export default function LogoUploader({ logoUrl, onLogoChange }: LogoUploaderProp
       return;
     }
 
+    if (!shopId) {
+      toast.error("Select a shop before uploading a logo");
+      return;
+    }
+
     setUploading(true);
+    // Storage RLS only allows writes under <shop_id>/, so the shop folder is
+    // part of the path, not optional.
     const ext = file.name.split(".").pop();
-    const path = `logo-${Date.now()}.${ext}`;
+    const path = `${shopId}/logo-${Date.now()}.${ext}`;
 
     const { error } = await supabase.storage.from("business_assets").upload(path, file, { upsert: true });
     if (error) {

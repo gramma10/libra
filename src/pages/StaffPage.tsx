@@ -11,20 +11,24 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Pencil, Trash2, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
+import { ALL_SCOPE, applyShopScope } from "@/lib/shopScope";
+import { ShopBadge } from "@/components/franchise/ShopBadge";
+import { ShopFilterSelect } from "@/components/franchise/ShopFilterSelect";
 
 interface Staff {
   id: string; first_name: string; last_name: string; phone: string; email: string | null;
   role: string; commission_rate: number; is_active: boolean; user_id: string | null; created_at: string;
+  shop_id: string;
 }
 
 const defaultForm = {
   first_name: "", last_name: "", phone: "", email: "", password: "",
-  role: "Stylist", commission_rate: 0, is_active: true,
+  role: "Stylist", commission_rate: 0, is_active: true, shop_id: "",
 };
 
 export default function StaffPage() {
   const qc = useQueryClient();
-  const { shopId } = useShop();
+  const { shopId, scope, setScope, isFranchise } = useShop();
   const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Staff | null>(null);
@@ -33,9 +37,10 @@ export default function StaffPage() {
   const [emailError, setEmailError] = useState("");
 
   const { data: staff = [], isLoading } = useQuery({
-    queryKey: ["staff"],
+    queryKey: ["staff", scope],
     queryFn: async () => {
-      const { data, error } = await supabase.from("staff").select("*").order("first_name");
+      const query = supabase.from("staff").select("*").order("first_name");
+      const { data, error } = await applyShopScope(query, scope);
       if (error) throw error;
       return data as Staff[];
     },
@@ -55,6 +60,8 @@ export default function StaffPage() {
 
   const createStaff = useMutation({
     mutationFn: async (values: typeof form) => {
+      const targetShopId = values.shop_id || shopId;
+      if (!targetShopId) throw new Error(t("franchise.shopRequired"));
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData?.session?.access_token;
       if (!token) throw new Error("Not authenticated");
@@ -64,6 +71,7 @@ export default function StaffPage() {
         body: JSON.stringify({
           email: values.email, password: values.password, first_name: values.first_name,
           last_name: values.last_name, phone: values.phone, role: values.role, commission_rate: values.commission_rate,
+          shop_id: targetShopId,
         }),
       });
       const result = await res.json();
@@ -89,7 +97,7 @@ export default function StaffPage() {
   function openAdd() { setEditing(null); setForm(defaultForm); setEmailError(""); setShowPassword(false); setOpen(true); }
   function openEdit(s: Staff) {
     setEditing(s);
-    setForm({ first_name: s.first_name, last_name: s.last_name, phone: s.phone, email: s.email ?? "", password: "", role: s.role, commission_rate: Number(s.commission_rate), is_active: s.is_active });
+    setForm({ first_name: s.first_name, last_name: s.last_name, phone: s.phone, email: s.email ?? "", password: "", role: s.role, commission_rate: Number(s.commission_rate), is_active: s.is_active, shop_id: s.shop_id });
     setEmailError(""); setOpen(true);
   }
   function closeDialog() { setOpen(false); setEditing(null); setForm(defaultForm); setEmailError(""); }
@@ -100,20 +108,26 @@ export default function StaffPage() {
     else {
       if (!form.email) { setEmailError(t("staff.emailRequired")); return; }
       if (!form.password || form.password.length < 6) { toast.error(t("staff.passwordMinError")); return; }
+      if (isFranchise && scope === ALL_SCOPE && !form.shop_id) { toast.error(t("franchise.shopRequired")); return; }
       createStaff.mutate(form);
     }
   }
 
   const isPending = createStaff.isPending || updateStaff.isPending;
+  const showShopColumn = isFranchise && scope === ALL_SCOPE;
+  const colSpan = showShopColumn ? 7 : 6;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("staff.title")}</h1>
           <p className="text-sm text-muted-foreground">{t("staff.subtitle")}</p>
         </div>
-        <Button onClick={openAdd} className="gap-2"><Plus className="h-4 w-4" /> {t("staff.addEmployee")}</Button>
+        <div className="flex items-center gap-2">
+          {isFranchise && <ShopFilterSelect value={scope} onChange={setScope} className="w-48" />}
+          <Button onClick={openAdd} className="gap-2"><Plus className="h-4 w-4" /> {t("staff.addEmployee")}</Button>
+        </div>
       </div>
 
       <div className="glass rounded-2xl shadow-apple overflow-x-auto">
@@ -121,6 +135,7 @@ export default function StaffPage() {
           <TableHeader>
             <TableRow>
               <TableHead>{t("staff.nameCol")}</TableHead>
+              {showShopColumn && <TableHead>{t("franchise.shop")}</TableHead>}
               <TableHead>{t("staff.role")}</TableHead>
               <TableHead>{t("staff.phoneCol")}</TableHead>
               <TableHead>{t("staff.commission")}</TableHead>
@@ -130,9 +145,9 @@ export default function StaffPage() {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">{t("common.loading")}</TableCell></TableRow>
+              <TableRow><TableCell colSpan={colSpan} className="text-center text-muted-foreground">{t("common.loading")}</TableCell></TableRow>
             ) : staff.length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">{t("staff.noEmployees")}</TableCell></TableRow>
+              <TableRow><TableCell colSpan={colSpan} className="text-center text-muted-foreground">{t("staff.noEmployees")}</TableCell></TableRow>
             ) : (
               staff.map((s) => (
                 <TableRow key={s.id}>
@@ -142,6 +157,7 @@ export default function StaffPage() {
                       {s.user_id && <Badge variant="outline" className="text-[10px] px-1.5 py-0">{t("staff.linked")}</Badge>}
                     </div>
                   </TableCell>
+                  {showShopColumn && <TableCell><ShopBadge shopId={s.shop_id} /></TableCell>}
                   <TableCell>{s.role}</TableCell>
                   <TableCell>{s.phone}</TableCell>
                   <TableCell>{Number(s.commission_rate)}%</TableCell>
@@ -163,6 +179,18 @@ export default function StaffPage() {
         <DialogContent>
           <DialogHeader><DialogTitle>{editing ? t("staff.editEmployee") : t("staff.addEmployee")}</DialogTitle></DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {!editing && isFranchise && scope === ALL_SCOPE && (
+              <div className="space-y-2">
+                <Label>{t("franchise.shop")}</Label>
+                <ShopFilterSelect
+                  value={form.shop_id}
+                  onChange={(v) => setForm({ ...form, shop_id: v as string })}
+                  requireSpecific
+                  always
+                  placeholder={t("franchise.selectShop")}
+                />
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2"><Label>{t("staff.firstNameLabel")}</Label><Input value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} required /></div>
               <div className="space-y-2"><Label>{t("staff.lastNameLabel")}</Label><Input value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} required /></div>

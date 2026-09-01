@@ -15,25 +15,29 @@ import { Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Tables, TablesInsert } from "@/integrations/supabase/types";
 import { useLanguage } from "@/hooks/useLanguage";
+import { ALL_SCOPE, applyShopScope } from "@/lib/shopScope";
+import { ShopBadge } from "@/components/franchise/ShopBadge";
+import { ShopFilterSelect } from "@/components/franchise/ShopFilterSelect";
 
 type Service = Tables<"services">;
 
-const defaultForm: Partial<TablesInsert<"services">> = {
+const defaultForm: Partial<TablesInsert<"services">> & { shop_id?: string } = {
   service_name: "", duration: 30, price: 0, category_color: "#000000",
 };
 
 export default function ServicesPage() {
   const qc = useQueryClient();
-  const { shopId } = useShop();
+  const { shopId, scope, setScope, isFranchise } = useShop();
   const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Service | null>(null);
   const [form, setForm] = useState(defaultForm);
 
   const { data: services = [], isLoading } = useQuery({
-    queryKey: ["services"],
+    queryKey: ["services", scope],
     queryFn: async () => {
-      const { data, error } = await supabase.from("services").select("*").order("service_name");
+      const query = supabase.from("services").select("*").order("service_name");
+      const { data, error } = await applyShopScope(query, scope);
       if (error) throw error;
       return data as Service[];
     },
@@ -47,8 +51,10 @@ export default function ServicesPage() {
         }).eq("id", values.id);
         if (error) throw error;
       } else {
+        const targetShopId = values.shop_id || shopId;
+        if (!targetShopId) throw new Error(t("franchise.shopRequired"));
         const { error } = await supabase.from("services").insert({
-          service_name: values.service_name!, duration: values.duration!, price: values.price!, category_color: values.category_color!, shop_id: shopId!,
+          service_name: values.service_name!, duration: values.duration!, price: values.price!, category_color: values.category_color!, shop_id: targetShopId,
         });
         if (error) throw error;
       }
@@ -82,14 +88,22 @@ export default function ServicesPage() {
   function closeDialog() { setOpen(false); setEditing(null); setForm(defaultForm); }
   function handleSubmit(e: React.FormEvent) { e.preventDefault(); upsert.mutate({ ...form, id: editing?.id }); }
 
+  const showShopColumn = isFranchise && scope === ALL_SCOPE;
+  const colSpan = showShopColumn ? 6 : 5;
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("services.title")}</h1>
           <p className="text-sm text-muted-foreground">{t("services.subtitle")}</p>
         </div>
-        <Button onClick={openAdd} className="gap-2"><Plus className="h-4 w-4" /> {t("services.addService")}</Button>
+        <div className="flex items-center gap-2">
+          {isFranchise && (
+            <ShopFilterSelect value={scope} onChange={setScope} className="w-48" />
+          )}
+          <Button onClick={openAdd} className="gap-2"><Plus className="h-4 w-4" /> {t("services.addService")}</Button>
+        </div>
       </div>
 
       <div className="glass rounded-2xl shadow-apple overflow-x-auto">
@@ -98,6 +112,7 @@ export default function ServicesPage() {
             <TableRow>
               <TableHead>{t("services.color")}</TableHead>
               <TableHead>{t("services.name")}</TableHead>
+              {showShopColumn && <TableHead>{t("franchise.shop")}</TableHead>}
               <TableHead>{t("services.duration")}</TableHead>
               <TableHead>{t("services.priceLabel")}</TableHead>
               <TableHead className="w-[100px]" />
@@ -105,14 +120,15 @@ export default function ServicesPage() {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">{t("services.loading")}</TableCell></TableRow>
+              <TableRow><TableCell colSpan={colSpan} className="text-center text-muted-foreground">{t("services.loading")}</TableCell></TableRow>
             ) : services.length === 0 ? (
-              <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">{t("services.noServices")}</TableCell></TableRow>
+              <TableRow><TableCell colSpan={colSpan} className="text-center text-muted-foreground">{t("services.noServices")}</TableCell></TableRow>
             ) : (
               services.map((s) => (
                 <TableRow key={s.id}>
                   <TableCell><div className="h-5 w-5 rounded-full border border-border" style={{ background: s.category_color }} /></TableCell>
                   <TableCell className="font-medium">{s.service_name}</TableCell>
+                  {showShopColumn && <TableCell><ShopBadge shopId={s.shop_id} /></TableCell>}
                   <TableCell>{s.duration} min</TableCell>
                   <TableCell>€{Number(s.price).toFixed(2)}</TableCell>
                   <TableCell>
@@ -134,6 +150,18 @@ export default function ServicesPage() {
             <DialogTitle>{editing ? t("services.editService") : t("services.addService")}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {!editing && isFranchise && scope === ALL_SCOPE && (
+              <div className="space-y-2">
+                <Label>{t("franchise.shop")}</Label>
+                <ShopFilterSelect
+                  value={form.shop_id || ""}
+                  onChange={(v) => setForm({ ...form, shop_id: v as string })}
+                  requireSpecific
+                  always
+                  placeholder={t("franchise.selectShop")}
+                />
+              </div>
+            )}
             <div className="space-y-2"><Label>{t("services.serviceName")}</Label><Input value={form.service_name} onChange={(e) => setForm({ ...form, service_name: e.target.value })} required /></div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2"><Label>{t("services.durationMin")}</Label><Input type="number" min={5} value={form.duration} onChange={(e) => setForm({ ...form, duration: Number(e.target.value) })} required /></div>

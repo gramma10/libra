@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useBookingTheme } from "@/hooks/useBookingTheme";
 import { DEFAULT_THEME, type ThemeSettings } from "@/components/settings/ThemePresets";
 import { hexToHSL, isLightColor, adjustHex } from "@/lib/color-utils";
 interface DayHours {
@@ -60,7 +59,7 @@ export default function BookingWidget() {
   const [shopName, setShopName] = useState("");
   const [operatingHours, setOperatingHours] = useState<DayHours[]>([]);
 
-  const { theme, loaded: themeLoaded } = useBookingTheme(shopId);
+  const [theme, setTheme] = useState<ThemeSettings>(DEFAULT_THEME);
 
   // Generate time slots from operating hours for a given date
   const getTimeSlotsForDate = (date: Date): string[] => {
@@ -104,36 +103,38 @@ export default function BookingWidget() {
 
   useEffect(() => {
     const init = async () => {
-      // Resolve shop_id + slug from URL slug or fall back to first available
-      let resolvedShopId: string | null = null;
-      let resolvedSlug: string | null = null;
-      if (slug) {
-        const { data: shop } = await supabase.from("shops").select("id, slug").eq("slug", slug).maybeSingle();
-        resolvedShopId = shop?.id || null;
-        resolvedSlug = shop?.slug || null;
+      // One scoped RPC replaces four direct table reads. The anon role has no
+      // SELECT access to shops / services / staff / business_settings any more,
+      // so everything the widget renders comes from this single shop payload.
+      if (!slug) {
+        setLoading(false);
+        return;
       }
-      if (!resolvedShopId) {
-        const { data: shop } = await supabase.from("shops").select("id, slug").limit(1).single();
-        resolvedShopId = shop?.id || null;
-        resolvedSlug = shop?.slug || null;
-      }
-      setShopId(resolvedShopId);
-      setShopSlug(resolvedSlug);
 
-      const filter = resolvedShopId ? { shop_id: resolvedShopId } : {};
-      const [svcRes, staffRes, settingsRes] = await Promise.all([
-        supabase.from("services").select("*").match(filter).order("service_name"),
-        supabase.from("staff").select("*").match(filter).eq("is_active", true).order("first_name"),
-        supabase.from("business_settings").select("logo_url, shop_name, operating_hours").match(filter).limit(1).single(),
-      ]);
-      setServices(svcRes.data || []);
-      setStaffList(staffRes.data || []);
-      if (settingsRes.data) {
-        setLogoUrl(settingsRes.data.logo_url || "");
-        setShopName(settingsRes.data.shop_name || "");
-        if (settingsRes.data.operating_hours) {
-          setOperatingHours(settingsRes.data.operating_hours as unknown as DayHours[]);
-        }
+      const { data, error } = await supabase.rpc("public_get_booking_bootstrap", { _slug: slug });
+      if (error || !data) {
+        setLoading(false);
+        return;
+      }
+
+      const boot = data as unknown as {
+        shop?: { id: string; name: string; slug: string; theme_settings: ThemeSettings | null };
+        settings?: { logo_url: string | null; shop_name: string | null; operating_hours: unknown } | null;
+        services?: Record<string, unknown>[];
+        staff?: Record<string, unknown>[];
+      };
+
+      setShopId(boot.shop?.id ?? null);
+      setShopSlug(boot.shop?.slug ?? null);
+      setServices(boot.services ?? []);
+      setStaffList(boot.staff ?? []);
+      setLogoUrl(boot.settings?.logo_url || "");
+      setShopName(boot.settings?.shop_name || boot.shop?.name || "");
+      if (boot.settings?.operating_hours) {
+        setOperatingHours(boot.settings.operating_hours as DayHours[]);
+      }
+      if (boot.shop?.theme_settings) {
+        setTheme({ ...DEFAULT_THEME, ...boot.shop.theme_settings });
       }
       setLoading(false);
     };

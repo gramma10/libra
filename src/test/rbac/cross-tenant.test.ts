@@ -330,3 +330,98 @@ describe("Public RPC cannot be tricked into cross-shop writes", () => {
     expect(error).toBeTruthy();
   });
 });
+
+describe("Anon booking surface is limited to ONE shop", () => {
+  // Regression guard for the four `USING (true)` policies that used to let any
+  // anonymous caller enumerate every shop's staff, services and settings.
+  const lockedTables = ["shops", "staff", "services", "business_settings"] as const;
+
+  for (const table of lockedTables) {
+    it(`anon cannot SELECT ${table} directly`, async () => {
+      const { data, error } = await anonClient().from(table).select("*").limit(1);
+      if (error) {
+        expect(error.code === "42501" || error.code === "PGRST301").toBe(true);
+      } else {
+        expect(data ?? []).toEqual([]);
+      }
+    });
+  }
+
+  it("public_get_booking_bootstrap returns only the requested shop", async () => {
+    const { data, error } = await anonClient().rpc("public_get_booking_bootstrap", {
+      _slug: world.shopA.slug,
+    });
+    expect(error).toBeNull();
+
+    const boot = data as unknown as {
+      shop: { id: string; slug: string };
+      services: { id: string }[];
+      staff: { id: string }[];
+    } | null;
+
+    expect(boot).toBeTruthy();
+    expect(boot!.shop.id).toBe(world.shopA.shopId);
+
+    const serviceIds = boot!.services.map((s) => s.id);
+    const staffIds = boot!.staff.map((s) => s.id);
+
+    expect(serviceIds).toContain(world.shopA.serviceId);
+    expect(serviceIds).not.toContain(world.shopB.serviceId);
+    expect(staffIds).not.toContain(world.shopB.staffRecordIds.staff);
+    expect(staffIds).not.toContain(world.shopB.staffRecordIds.admin);
+  });
+
+  it("public_get_booking_bootstrap leaks no staff PII", async () => {
+    const { data } = await anonClient().rpc("public_get_booking_bootstrap", {
+      _slug: world.shopA.slug,
+    });
+    const staff = (data as unknown as { staff: Record<string, unknown>[] }).staff;
+    expect(staff.length).toBeGreaterThan(0);
+    for (const s of staff) {
+      expect(s).not.toHaveProperty("phone");
+      expect(s).not.toHaveProperty("email");
+      expect(s).not.toHaveProperty("commission_rate");
+      expect(s).not.toHaveProperty("user_id");
+    }
+  });
+
+  it("public_get_booking_bootstrap returns null for an unknown slug", async () => {
+    const { data, error } = await anonClient().rpc("public_get_booking_bootstrap", {
+      _slug: "definitely-not-a-real-shop-slug",
+    });
+    expect(error).toBeNull();
+    expect(data).toBeNull();
+  });
+});
+
+describe("create_shop requires a valid creator code", () => {
+  it("rejects a wrong creator code", async () => {
+    const { error } = await clients["A-admin"].rpc("create_shop", {
+      _name: "Forged Shop",
+      _slug: `forged-${Date.now().toString(36)}`,
+      _creator_code: "definitely-wrong-code",
+    });
+    expect(error).toBeTruthy();
+  });
+
+  it("rejects an anonymous caller outright", async () => {
+    const { error } = await anonClient().rpc("create_shop", {
+      _name: "Anon Shop",
+      _slug: `anon-${Date.now().toString(36)}`,
+      _creator_code: "definitely-wrong-code",
+    });
+    expect(error).toBeTruthy();
+  });
+
+  it("creator_codes table is not readable through the API", async () => {
+    const { data, error } = await clients["A-admin"]
+      .from("creator_codes" as never)
+      .select("*")
+      .limit(1);
+    if (error) {
+      expect(error).toBeTruthy();
+    } else {
+      expect(data ?? []).toEqual([]);
+    }
+  });
+});

@@ -10,7 +10,7 @@ import { toast } from "sonner";
 interface SellProductDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  product: { id: string; product_name: string; current_stock: number; retail_price: number } | null;
+  product: { id: string; product_name: string; current_stock: number; retail_price: number; shop_id?: string } | null;
   onSuccess: () => void;
 }
 
@@ -30,13 +30,16 @@ export default function SellProductDialog({ open, onOpenChange, product, onSucce
 
     setSaving(true);
 
+    const targetShopId = product.shop_id || shopId;
+    if (!targetShopId) { toast.error("Shop not resolved"); setSaving(false); return; }
+
     const { error: saleError } = await supabase.from("product_sales").insert({
       inventory_id: product.id,
       quantity,
       unit_price: Number(product.retail_price),
       total_amount: total,
       sale_date: saleDate,
-      shop_id: shopId!,
+      shop_id: targetShopId,
     });
 
     if (saleError) { toast.error(saleError.message); setSaving(false); return; }

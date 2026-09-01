@@ -1,10 +1,57 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
+
+/**
+ * This function spends real money (Apifon SMS credits) and is deployed with
+ * verify_jwt = false, so it must authenticate the caller itself.
+ *
+ * Accepted callers:
+ *  1. Internal service-to-service calls (check-reminders invokes this with the
+ *     service role key).
+ *  2. A signed-in dashboard user (the "send test SMS" button in Settings).
+ *
+ * The anon key is deliberately NOT accepted: it is public, shipped in the
+ * browser bundle, and carries no `sub` claim.
+ */
+async function isAuthorizedCaller(req: Request): Promise<boolean> {
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+  if (!token) return false;
+
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (serviceRoleKey && token === serviceRoleKey) return true;
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  if (!supabaseUrl || !anonKey) return false;
+
+  // A bare anon key would authenticate as nobody, so require a real user id.
+  const caller = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  });
+
+  try {
+    const { data } = await caller.auth.getClaims(token);
+    if (data?.claims?.sub) return true;
+  } catch {
+    // getClaims not available in this client build — fall through to getUser.
+  }
+
+  try {
+    const { data } = await caller.auth.getUser(token);
+    if (data?.user?.id) return true;
+  } catch {
+    // ignore
+  }
+
+  return false;
+}
 
 async function generateHmacSignature(
   secretKey: string,
@@ -33,6 +80,13 @@ async function generateHmacSignature(
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
+  }
+
+  if (!(await isAuthorizedCaller(req))) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 
   try {

@@ -1,8 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useShop, type ShopRole } from "@/hooks/useShop";
+import { ALL_SCOPE } from "@/lib/shopScope";
 
-export type AppRole = "admin" | "manager" | "staff";
+export type AppRole = ShopRole;
 
 interface RoleState {
   role: AppRole | null;
@@ -11,55 +13,69 @@ interface RoleState {
   isManager: boolean;
   isStaff: boolean;
   staffRecordId: string | null;
+  roleFor: (shopId: string | null | undefined) => AppRole | null;
 }
 
 export function useRole(): RoleState {
   const { user } = useAuth();
-  const [role, setRole] = useState<AppRole | null>(null);
+  const { memberships, scope, loading: shopLoading } = useShop();
   const [staffRecordId, setStaffRecordId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [staffLoading, setStaffLoading] = useState(true);
 
   useEffect(() => {
     if (!user) {
-      setRole(null);
       setStaffRecordId(null);
-      setLoading(false);
+      setStaffLoading(false);
       return;
     }
-
-    const fetchRole = async () => {
-      setLoading(true);
-
-      // Fetch role from shop_members table (replaces user_roles)
-      const { data: memberData } = await supabase
-        .from("shop_members")
-        .select("role")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      const userRole = (memberData?.role as AppRole) || null;
-      setRole(userRole);
-
-      // Always check for linked staff record (admins/managers may also have one)
-      const { data: staffData } = await supabase
-        .from("staff")
-        .select("id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      setStaffRecordId(staffData?.id || null);
-
-      setLoading(false);
+    let cancelled = false;
+    setStaffLoading(true);
+    supabase
+      .from("staff")
+      .select("id")
+      .eq("user_id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return;
+        setStaffRecordId(data?.id ?? null);
+        setStaffLoading(false);
+      });
+    return () => {
+      cancelled = true;
     };
-
-    fetchRole();
   }, [user?.id]);
+
+  const roleMap = useMemo<Record<string, AppRole>>(() => {
+    const m: Record<string, AppRole> = {};
+    for (const x of memberships) m[x.shopId] = x.role;
+    return m;
+  }, [memberships]);
+
+  const roleFor = useCallback(
+    (shopId: string | null | undefined) => (shopId ? roleMap[shopId] ?? null : null),
+    [roleMap],
+  );
+
+  // For the legacy `role` / `isAdmin` shape: in franchise scope='ALL', report
+  // the highest privilege the user holds in any of their shops. For a specific
+  // scope, report their role in that shop.
+  const role: AppRole | null = useMemo(() => {
+    if (memberships.length === 0) return null;
+    if (scope === ALL_SCOPE) {
+      if (memberships.some((m) => m.role === "admin")) return "admin";
+      if (memberships.some((m) => m.role === "manager")) return "manager";
+      return memberships[0].role;
+    }
+    return roleMap[scope] ?? null;
+  }, [memberships, scope, roleMap]);
 
   return {
     role,
-    loading,
+    loading: shopLoading || staffLoading,
     isAdmin: role === "admin",
     isManager: role === "manager",
     isStaff: role === "staff",
     staffRecordId,
+    roleFor,
   };
 }

@@ -12,6 +12,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Textarea } from "@/components/ui/textarea";
 import ClientFilters from "@/components/clients/ClientFilters";
 import { useLanguage } from "@/hooks/useLanguage";
+import { ALL_SCOPE, applyShopScope } from "@/lib/shopScope";
+import { ShopBadge } from "@/components/franchise/ShopBadge";
+import { ShopFilterSelect } from "@/components/franchise/ShopFilterSelect";
 
 interface FilterValues {
   search: string;
@@ -30,9 +33,10 @@ const defaultFilters: FilterValues = {
 };
 
 export default function ClientsPage() {
-  const { shopId } = useShop();
+  const { shopId, scope: shopScope, setScope: setShopScope, isFranchise } = useShop();
   const { t, locale } = useLanguage();
   const [clients, setClients] = useState<any[]>([]);
+  const [formShopId, setFormShopId] = useState<string>("");
   const [selected, setSelected] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -50,25 +54,28 @@ export default function ClientsPage() {
   const [clientRevenue, setClientRevenue] = useState<Record<string, number>>({});
   const [clientVisitCount, setClientVisitCount] = useState<Record<string, number>>({});
 
-  const fetchClients = async () => {
+  const fetchClients = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase.from("clients").select("*").order("first_name");
+    const query = supabase.from("clients").select("*").order("first_name");
+    const { data } = await applyShopScope(query, shopScope);
     setClients(data || []);
-    if (data && data.length > 0 && !selected) setSelected(data[0]);
+    setSelected((prev: any) => prev ?? (data && data.length > 0 ? data[0] : null));
     setLoading(false);
-  };
+  }, [shopScope]);
 
   useEffect(() => {
     fetchClients();
-    // Fetch services for filter dropdown
-    supabase.from("services").select("id, service_name").then(({ data }) => {
+    // Fetch services for filter dropdown (scoped)
+    applyShopScope(supabase.from("services").select("id, service_name"), shopScope).then(({ data }) => {
       setServices(data || []);
     });
-    // Fetch appointment data for filters (service history, last visit, revenue)
-    supabase
-      .from("appointments")
-      .select("id, client_id, service_id, start_time, end_time, status, services!appointments_service_id_fkey(price), appointment_services!appt_services_appointment_fk(price, service_id)")
-      .then(({ data }) => {
+    // Fetch appointment data for filters (service history, last visit, revenue) — scoped
+    applyShopScope(
+      supabase
+        .from("appointments")
+        .select("id, client_id, service_id, start_time, end_time, status, services!appointments_service_id_fkey(price), appointment_services!appt_services_appointment_fk(price, service_id)"),
+      shopScope,
+    ).then(({ data }) => {
         const serviceMap: Record<string, Set<string>> = {};
         const lastVisitMap: Record<string, Date> = {};
         const revenueMap: Record<string, number> = {};
@@ -105,7 +112,7 @@ export default function ClientsPage() {
         setClientRevenue(revenueMap);
         setClientVisitCount(visitCountMap);
       });
-  }, []);
+  }, [fetchClients, shopScope]);
 
   // Fetch appointments for selected client
   useEffect(() => {
@@ -232,16 +239,24 @@ export default function ClientsPage() {
       toast.error("Name and phone are required");
       return;
     }
+    const targetShopId = formShopId || shopId;
+    if (!targetShopId) { toast.error(t("franchise.shopRequired")); return; }
     setSaving(true);
-    const { error } = await supabase.from("clients").insert({ ...form, shop_id: shopId! });
+    const { error } = await supabase.from("clients").insert({ ...form, shop_id: targetShopId });
     if (error) toast.error(error.message);
     else {
       toast.success("Client added");
       setShowAdd(false);
       setForm({ first_name: "", last_name: "", phone_mobile: "", email: "", tech_notes: "", personal_preferences: "" });
+      setFormShopId("");
       fetchClients();
     }
     setSaving(false);
+  };
+
+  const openAdd = () => {
+    setFormShopId(shopScope === ALL_SCOPE ? "" : (shopId ?? ""));
+    setShowAdd(true);
   };
 
   const openEdit = () => {
@@ -339,13 +354,16 @@ export default function ClientsPage() {
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">{t("clients.title")}</h1>
-        <Button className="rounded-xl gap-2 shrink-0" onClick={() => setShowAdd(true)}>
-          <Plus className="h-4 w-4" strokeWidth={1.5} />
-          <span className="hidden sm:inline">Add Client</span>
-          <span className="sm:hidden">Add</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          {isFranchise && <ShopFilterSelect value={shopScope} onChange={setShopScope} className="w-48" />}
+          <Button className="rounded-xl gap-2 shrink-0" onClick={openAdd}>
+            <Plus className="h-4 w-4" strokeWidth={1.5} />
+            <span className="hidden sm:inline">Add Client</span>
+            <span className="sm:hidden">Add</span>
+          </Button>
+        </div>
       </div>
 
       {loading ? (
@@ -372,8 +390,11 @@ export default function ClientsPage() {
                     selected?.id === client.id ? "bg-primary text-primary-foreground shadow-apple" : "hover:bg-accent"
                   )}
                 >
-                  <div>
-                    <p className="text-sm font-medium">{client.first_name} {client.last_name}</p>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium truncate">{client.first_name} {client.last_name}</p>
+                      <ShopBadge shopId={client.shop_id} className={cn("text-[10px] px-1.5 py-0", selected?.id === client.id && "border-primary-foreground/30 text-primary-foreground")} />
+                    </div>
                     <p className={cn("text-xs mt-0.5", selected?.id === client.id ? "text-primary-foreground/70" : "text-muted-foreground")}>
                       {client.phone_mobile}
                     </p>
@@ -561,6 +582,19 @@ export default function ClientsPage() {
         <DialogContent className="rounded-2xl">
           <DialogHeader><DialogTitle>Add Client</DialogTitle></DialogHeader>
           <div className="space-y-3">
+            {isFranchise && shopScope === ALL_SCOPE && (
+              <div className="space-y-1">
+                <label className="text-sm font-medium">{t("franchise.shop")} *</label>
+                <ShopFilterSelect
+                  value={formShopId}
+                  onChange={(v) => setFormShopId(v as string)}
+                  requireSpecific
+                  always
+                  placeholder={t("franchise.selectShop")}
+                  className="rounded-xl"
+                />
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-sm font-medium">First Name *</label>

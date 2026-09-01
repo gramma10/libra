@@ -10,8 +10,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
 
-const CREATOR_CODE = "patata@@1938";
-
 export default function OnboardingPage() {
   const navigate = useNavigate();
   const { session } = useAuth();
@@ -28,15 +26,30 @@ export default function OnboardingPage() {
   if (hasShop) { navigate("/", { replace: true }); return null; }
 
   const generateSlug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "my-shop";
-  const codeValid = creatorCode === CREATOR_CODE;
+  // The code is verified server-side inside create_shop; the browser only
+  // checks that something was typed.
+  const codeEntered = creatorCode.trim().length > 0;
 
   const handleCreate = async () => {
-    if (!codeValid) { setCodeError(t("onboarding.codeError")); return; }
+    if (!codeEntered) { setCodeError(t("onboarding.codeError")); return; }
     if (!shopName.trim()) { toast.error(t("onboarding.enterShopName")); return; }
     setLoading(true);
     const slug = generateSlug(shopName) + "-" + Date.now().toString(36);
-    const { error } = await supabase.rpc("create_shop", { _name: shopName.trim(), _slug: slug });
-    if (error) { toast.error(error.message); setLoading(false); return; }
+    const { error } = await supabase.rpc("create_shop", {
+      _name: shopName.trim(),
+      _slug: slug,
+      _creator_code: creatorCode,
+      _address: address.trim() || null,
+    });
+    if (error) {
+      if ((error.message || "").toLowerCase().includes("creator code")) {
+        setCodeError(t("onboarding.codeError"));
+      } else {
+        toast.error(error.message);
+      }
+      setLoading(false);
+      return;
+    }
     toast.success(t("onboarding.shopReady"));
     refetch(); navigate("/", { replace: true }); setLoading(false);
   };
@@ -73,7 +86,7 @@ export default function OnboardingPage() {
               <label className="text-sm font-medium">{t("onboarding.address")}</label>
               <Input placeholder={t("onboarding.addressPlaceholder")} value={address} onChange={(e) => setAddress(e.target.value)} className="rounded-xl" />
             </div>
-            <Button className="w-full rounded-xl gap-2" onClick={handleCreate} disabled={loading || !shopName.trim() || !codeValid}>
+            <Button className="w-full rounded-xl gap-2" onClick={handleCreate} disabled={loading || !shopName.trim() || !codeEntered}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
               {t("onboarding.createShop")}
             </Button>

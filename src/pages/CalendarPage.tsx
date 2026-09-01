@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useShop } from "@/hooks/useShop";
+import { applyShopScope } from "@/lib/shopScope";
 import CalendarHeader, { CalendarView } from "@/components/calendar/CalendarHeader";
 import DayView from "@/components/calendar/DayView";
 import WeekView from "@/components/calendar/WeekView";
@@ -15,7 +16,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 const today = new Date();
 
 export default function CalendarPage() {
-  const { shopId } = useShop();
+  const { shopId, scope: shopScope } = useShop();
   const { t } = useLanguage();
   const [currentDate, setCurrentDate] = useState(today);
   const [view, setView] = useState<CalendarView>("day");
@@ -56,9 +57,17 @@ export default function CalendarPage() {
     setLoading(true);
     const { start, end } = getDateRange();
     const [apptRes, svcRes, staffRes] = await Promise.all([
-      supabase.from("appointments").select("*, clients!appointments_client_fk(first_name, last_name, phone_mobile, email, personal_preferences, tech_notes), services!appointments_service_id_fkey(service_name, duration, category_color)").gte("start_time", start.toISOString()).lte("start_time", end.toISOString()).order("start_time"),
-      supabase.from("services").select("*").order("service_name"),
-      supabase.from("staff").select("*").eq("is_active", true).order("first_name"),
+      applyShopScope(
+        supabase
+          .from("appointments")
+          .select("*, clients!appointments_client_fk(first_name, last_name, phone_mobile, email, personal_preferences, tech_notes), services!appointments_service_id_fkey(service_name, duration, category_color)")
+          .gte("start_time", start.toISOString())
+          .lte("start_time", end.toISOString())
+          .order("start_time"),
+        shopScope,
+      ),
+      applyShopScope(supabase.from("services").select("*").order("service_name"), shopScope),
+      applyShopScope(supabase.from("staff").select("*").eq("is_active", true).order("first_name"), shopScope),
     ]);
     setAppointments(apptRes.data || []);
     setServices(svcRes.data || []);
@@ -66,7 +75,7 @@ export default function CalendarPage() {
     setLoading(false);
   };
 
-  useEffect(() => { fetchData(); }, [currentDate.toDateString(), view]);
+  useEffect(() => { fetchData(); }, [currentDate.toDateString(), view, shopScope]);
 
   const navigate = (dir: number) => {
     const d = new Date(currentDate);

@@ -43,30 +43,55 @@ Deno.serve(async (req) => {
 
     const callerUserId = claimsData.claims.sub;
 
-    // Check caller is admin
-    const { data: roleData } = await callerClient.rpc("get_user_role", {
-      _user_id: callerUserId,
-    });
-    if (roleData !== "admin") {
-      return new Response(JSON.stringify({ error: "Only admins can create staff accounts" }), {
+    const body = await req.json();
+    const {
+      email,
+      password,
+      first_name,
+      last_name,
+      phone,
+      role,
+      commission_rate,
+      shop_id: bodyShopId,
+    } = body;
+
+    // Resolve target shop. For multi-shop admins the client must specify shop_id;
+    // for single-shop admins we allow falling back to their only membership.
+    let shopId: string | null = bodyShopId ?? null;
+    if (!shopId) {
+      const { data: memberships } = await callerClient
+        .from("shop_members")
+        .select("shop_id")
+        .eq("user_id", callerUserId)
+        .eq("role", "admin");
+      if (!memberships || memberships.length === 0) {
+        return new Response(JSON.stringify({ error: "No shop found for admin" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (memberships.length > 1) {
+        return new Response(JSON.stringify({ error: "shop_id is required when admin of multiple shops" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      shopId = memberships[0].shop_id;
+    }
+
+    // Verify caller is an admin of the target shop.
+    const { data: isAdminRow } = await callerClient
+      .from("shop_members")
+      .select("role")
+      .eq("user_id", callerUserId)
+      .eq("shop_id", shopId)
+      .maybeSingle();
+    if (!isAdminRow || isAdminRow.role !== "admin") {
+      return new Response(JSON.stringify({ error: "Only admins of this shop can create staff accounts" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    // Get caller's shop
-    const { data: shopId } = await callerClient.rpc("get_user_shop_id", {
-      _user_id: callerUserId,
-    });
-    if (!shopId) {
-      return new Response(JSON.stringify({ error: "No shop found for admin" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const body = await req.json();
-    const { email, password, first_name, last_name, phone, role, commission_rate } = body;
 
     if (!email || !password || !first_name || !last_name) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {

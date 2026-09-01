@@ -417,4 +417,14 @@ export const el: Record<TranslationKey, string> = {
   "aiSummary.period.day": "Ημέρα",
   "aiSummary.period.week": "Εβδομάδα",
   "aiSummary.period.month": "Μήνας",
+
+  // Franchise
+  "franchise.franchiseOverview": "Επισκόπηση Δικτύου",
+  "franchise.allShops": "Όλα τα καταστήματα",
+  "franchise.selectShop": "Επιλέξτε κατάστημα",
+  "franchise.switchShop": "Αλλαγή καταστήματος",
+  "franchise.shop": "Κατάστημα",
+  "franchise.shopRequired": "Επιλέξτε κατάστημα",
+  "franchise.perShopRevenueTitle": "Έσοδα ανά κατάστημα",
+  "franchise.lowStockBanner": "Χαμηλό απόθεμα στο δίκτυο",
 };

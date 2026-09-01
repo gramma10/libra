@@ -26,11 +26,13 @@ CREATE TABLE public.shop_members (
 ALTER TABLE public.shop_members ENABLE ROW LEVEL SECURITY;
 
 -- 3. CREATE INVITATIONS TABLE
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 CREATE TABLE public.invitations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   shop_id uuid NOT NULL REFERENCES public.shops(id) ON DELETE CASCADE,
   staff_id uuid NOT NULL REFERENCES public.staff(id) ON DELETE CASCADE,
-  invite_code text UNIQUE NOT NULL DEFAULT encode(gen_random_bytes(16), 'hex'),
+  invite_code text UNIQUE NOT NULL DEFAULT encode(extensions.gen_random_bytes(16), 'hex'),
   status text NOT NULL DEFAULT 'pending',
   expires_at timestamptz NOT NULL DEFAULT (now() + interval '7 days'),
   created_at timestamptz NOT NULL DEFAULT now()

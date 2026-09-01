@@ -11,6 +11,8 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { toast } from "sonner";
 import { Repeat } from "lucide-react";
 import type { Expense } from "@/pages/ExpensesPage";
+import { ALL_SCOPE } from "@/lib/shopScope";
+import { ShopFilterSelect } from "@/components/franchise/ShopFilterSelect";
 
 const CATEGORIES = ["Rent", "Electricity", "Water", "Products", "Salaries", "Marketing", "Other"] as const;
 const STATUSES = ["Paid", "Pending"] as const;
@@ -30,7 +32,7 @@ interface Props {
 }
 
 export default function ExpenseDialog({ open, onOpenChange, expense, onSaved }: Props) {
-  const { shopId } = useShop();
+  const { shopId, scope: shopScope, isFranchise } = useShop();
   const { t } = useLanguage();
   const [date, setDate] = useState("");
   const [category, setCategory] = useState<string>("Other");
@@ -40,6 +42,7 @@ export default function ExpenseDialog({ open, onOpenChange, expense, onSaved }: 
   const [recurrence, setRecurrence] = useState<string>("none");
   const [saving, setSaving] = useState(false);
   const [scope, setScope] = useState<"this" | "future">("this");
+  const [targetShopId, setTargetShopId] = useState<string>("");
 
   const isOccurrence = !!expense?.recurrence_parent_id;
   const isRecurringTemplate = !!expense && !expense.recurrence_parent_id && (expense.recurrence_interval || "none") !== "none";
@@ -55,6 +58,7 @@ export default function ExpenseDialog({ open, onOpenChange, expense, onSaved }: 
       setStatus(expense.status);
       setDescription(expense.description || "");
       setRecurrence(expense.recurrence_interval || "none");
+      setTargetShopId(expense.shop_id || "");
     } else {
       setDate(new Date().toISOString().split("T")[0]);
       setCategory("Other");
@@ -62,9 +66,10 @@ export default function ExpenseDialog({ open, onOpenChange, expense, onSaved }: 
       setStatus("Pending");
       setDescription("");
       setRecurrence("none");
+      setTargetShopId(shopScope === ALL_SCOPE ? "" : (shopId ?? ""));
     }
     setScope("this");
-  }, [expense, open]);
+  }, [expense, open, shopScope, shopId]);
 
   const handleSave = async () => {
     if (!date || !amount) { toast.error(t("expenses.dateAmountRequired")); return; }
@@ -95,7 +100,9 @@ export default function ExpenseDialog({ open, onOpenChange, expense, onSaved }: 
           .gt("date", expense.date);
       }
     } else {
-      payload.shop_id = shopId;
+      const insertShopId = targetShopId || shopId;
+      if (!insertShopId) { toast.error(t("franchise.shopRequired")); setSaving(false); return; }
+      payload.shop_id = insertShopId;
       payload.recurrence_interval = recurrence;
       const { error } = await supabase.from("expenses").insert(payload);
       if (error) { toast.error(t("expenses.saveFailed")); setSaving(false); return; }
@@ -114,6 +121,19 @@ export default function ExpenseDialog({ open, onOpenChange, expense, onSaved }: 
           <DialogTitle>{expense ? t("expenses.editExpense") : t("expenses.newExpense")}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 mt-2">
+          {!expense && isFranchise && shopScope === ALL_SCOPE && (
+            <div className="space-y-1.5">
+              <Label>{t("franchise.shop")}</Label>
+              <ShopFilterSelect
+                value={targetShopId}
+                onChange={(v) => setTargetShopId(v as string)}
+                requireSpecific
+                always
+                placeholder={t("franchise.selectShop")}
+                className="rounded-xl"
+              />
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label>{t("expenses.dateCol")}</Label>

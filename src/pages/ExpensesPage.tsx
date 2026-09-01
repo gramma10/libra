@@ -10,6 +10,9 @@ import { toast } from "sonner";
 import ExpenseDialog from "@/components/expenses/ExpenseDialog";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useShop } from "@/hooks/useShop";
+import { ALL_SCOPE, applyShopScope } from "@/lib/shopScope";
+import { ShopBadge } from "@/components/franchise/ShopBadge";
+import { ShopFilterSelect } from "@/components/franchise/ShopFilterSelect";
 
 const CATEGORIES = ["Rent", "Electricity", "Water", "Products", "Salaries", "Marketing", "Other"] as const;
 const STATUSES = ["Paid", "Pending"] as const;
@@ -19,6 +22,7 @@ export type Expense = {
   id: string; date: string; category: (typeof CATEGORIES)[number]; amount: number;
   status: (typeof STATUSES)[number]; description: string | null; created_at: string;
   recurrence_interval?: string; recurrence_parent_id?: string | null;
+  shop_id: string;
 };
 
 // Generate any missing recurring occurrences for a given month from active recurring templates.
@@ -93,7 +97,7 @@ async function generateRecurringForMonth(
 
 export default function ExpensesPage() {
   const { t, locale } = useLanguage();
-  const { shopId } = useShop();
+  const { shopId, scope: shopScope, setScope: setShopScope, isFranchise } = useShop();
   const [loading, setLoading] = useState(true);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -118,16 +122,17 @@ export default function ExpensesPage() {
     const start = new Date(year, month, 1).toISOString().split("T")[0];
     const end = new Date(year, month + 1, 0).toISOString().split("T")[0];
 
-    // Auto-generate missing recurring occurrences for this month
-    if (shopId) {
+    // Auto-generate missing recurring occurrences for this month (only when a single shop is selected)
+    if (shopId && shopScope !== ALL_SCOPE) {
       await generateRecurringForMonth(shopId, year, month);
     }
 
-    const { data, error } = await supabase.from("expenses").select("*").gte("date", start).lte("date", end).order("date", { ascending: false });
+    const query = supabase.from("expenses").select("*").gte("date", start).lte("date", end).order("date", { ascending: false });
+    const { data, error } = await applyShopScope(query, shopScope);
     if (error) toast.error("Failed to load expenses");
     setExpenses((data as Expense[]) || []);
     setLoading(false);
-  }, [filterMonth, filterYear, shopId]);
+  }, [filterMonth, filterYear, shopId, shopScope]);
 
   useEffect(() => { fetchExpenses(); }, [fetchExpenses]);
 
@@ -172,12 +177,15 @@ export default function ExpensesPage() {
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{t("expenses.title")}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{t("expenses.subtitle")}</p>
         </div>
-        <Button onClick={handleNew} className="rounded-xl gap-2"><Plus className="h-4 w-4" /> {t("expenses.newExpense")}</Button>
+        <div className="flex items-center gap-2">
+          {isFranchise && <ShopFilterSelect value={shopScope} onChange={setShopScope} className="w-48" />}
+          <Button onClick={handleNew} className="rounded-xl gap-2"><Plus className="h-4 w-4" /> {t("expenses.newExpense")}</Button>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
@@ -191,7 +199,7 @@ export default function ExpensesPage() {
             <SelectContent>{years.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent>
           </Select>
         </div>
-        {isPastMonth && (
+        {isPastMonth && shopScope !== ALL_SCOPE && (
           <Button
             variant="outline"
             size="sm"
@@ -227,6 +235,7 @@ export default function ExpensesPage() {
               <TableRow>
                 <TableHead>{t("expenses.dateCol")}</TableHead>
                 <TableHead>{t("expenses.category")}</TableHead>
+                {isFranchise && shopScope === ALL_SCOPE && <TableHead>{t("franchise.shop")}</TableHead>}
                 <TableHead>{t("expenses.description")}</TableHead>
                 <TableHead className="text-right">{t("expenses.amount")}</TableHead>
                 <TableHead>{t("expenses.statusCol")}</TableHead>
@@ -240,6 +249,9 @@ export default function ExpensesPage() {
                   <TableCell>
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${categoryColor[exp.category] || ""}`}>{exp.category}</span>
                   </TableCell>
+                  {isFranchise && shopScope === ALL_SCOPE && (
+                    <TableCell><ShopBadge shopId={exp.shop_id} /></TableCell>
+                  )}
                   <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
                     <div className="flex items-center gap-1.5">
                       {(exp.recurrence_interval && exp.recurrence_interval !== "none") || exp.recurrence_parent_id ? (
